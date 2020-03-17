@@ -276,7 +276,7 @@ if [ "$4" == "dos" ]; then
             cp -f $tmpvar05 "$3"
         fi
         tmp_size=$(cat $tmpvar04 | grep "Size" | sed 's/.*Size: //g' | sed 's/ .*//g')
-        tmp_type=$(cat $tmpvar04 | grep "Type" | sed 's/.*Type: //g' | sed 's/ .*//g')
+        tmp_type=$(cat $tmpvar04 | grep "Type" | sed 's@\/@-@g' | sed 's/.*Type: //g' | sed 's/ .*//g')
         cat "$3" | sed "s/part$tmp_cycle3/part$tmp_cycle3 $tmp_size $tmp_type/g" > $tmpvar05
         cp -f $tmpvar05 "$3"
     done
