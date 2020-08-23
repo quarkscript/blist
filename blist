@@ -1,5 +1,16 @@
 #!/bin/bash
 
+## checking of missing dialog
+if $(dialog 2>&1 | grep -q "command not found"); then
+echo '
+It looks like the "dialog" is not available. This script will not work without it.
+Lets try to install it:
+'; sleep 2; pacman -Sy; pacman -S dialog --noconfirm --needed; fi
+if $(dialog 2>&1 | grep -q "command not found"); then
+echo '
+Seems it did not work. Sorry.
+'; exit 0; fi
+
 batchlist='packages.txt'
 if [ -z "$1" ]; then
     exitstatus=$(mktemp XXXXXXXX.tmp)
@@ -110,11 +121,13 @@ elif [ "$3" == "t" ]; then
         echo $? >$1
     fi
     if [ "$(cat $1)" != 1 ]; then
-        dialog  --no-cancel --ok-label agree --radiolist "Warning! '$2' does not found A new '$2' will be created from template. Wich template do you want to use?" '' '' '' 'x86_64_plasma' '- plasma desktop' on 'x86_64_xfce' '- xfce desktop' '' 'ARM_303_xfce' '- xfce desktop on ARMv7hf xe303c12 chromebook' '' 2>$1
+        dialog  --no-cancel --ok-label agree --radiolist "Warning! '$2' does not found A new '$2' will be created from template. Wich template do you want to use?" '' '' '' 'x86_64_plasma' '- plasma desktop' on 'x86_64_xfce' '- xfce desktop' '' 'pmlike' '- similar to Parted Magic (not tested)' '' 'ARM_303_xfce' '- xfce desktop on ARMv7hf xe303c12 chromebook' '' 2>$1
             if [ "$(cat $1)" == "x86_64_plasma" ]; then
                 echo "acpi acpid alsa-utils ark audacity autoconf automake avidemux-qt bash binutils bison bluedevil bluez-cups bluez-hid2hci bluez-utils botan btrfs-progs bzip2 cargo cdrdao cmake conky coreutils crda cryptsetup cups cups-pdf device-mapper dhcpcd dialog diffutils dolphin dosfstools dvd+rw-tools e2fsprogs ecryptfs-utils ed f2fs-tools faac fakeroot file filesystem findutils firefox firefox-i18n-ru firefox-i18n-uk flex foomatic-db-engine gawk gcc gcc-libs gettext gimp git glibc gparted grep grub gsmartcontrol gst-libav gst-plugins-good gst-plugins-ugly gstreamer-vaapi gwenview gzip hidapi imake inetutils iproute2 iputils iw k3b kate kcalc kdegraphics-mobipocket kdenetwork-filesharing kimageformats konsole krita kscreen kwalletmanager ladspa less libmirage libreoffice-fresh libreoffice-fresh-ru libreoffice-fresh-uk libtool libva-vdpau-driver libvdpau-va-gl licenses linux linux-headers logrotate lvm2 m4 make man-db man-pages mc mdadm mediainfo mkvtoolnix-gui nano netctl networkmanager networkmanager-openvpn networkmanager-qt noto-fonts-cjk noto-fonts-emoji ntfs-3g nvidia-dkms nvidia-settings ocl-icd okular opencl-headers opencl-nvidia os-prober p7zip packagekit-qt5 pacman patch pciutils perl pigz pkg-config plasma-desktop plasma-nm plasma-pa powerdevil procps-ng psmisc psutils pulseaudio-alsa pulseaudio-bluetooth qt5-connectivity qt5-imageformats qt5-serialport qt5-virtualkeyboard ragel rcs samba sddm sddm-kcm sed shadow sudo sysfsutils systemd-sysvcompat tar texinfo thunderbird thunderbird-i18n-ru thunderbird-i18n-uk transcode transmission-qt ufw uget unrar unzip usbutils user-manager util-linux vcdimager vi vlc wget which wireless-regdb xf86-input-evdev xf86-input-libinput xf86-input-synaptics xf86-input-vmmouse xf86-input-void xf86-video-ati xf86-video-dummy xf86-video-fbdev xf86-video-vesa xf86-video-amdgpu xf86-video-ati xf86-video-intel xf86-video-nouveau xmlto xorg-bdftopcf xorg-docs xorg-font-util xorg-fonts-100dpi xorg-fonts-75dpi xorg-fonts-cyrillic xorg-fonts-encodings xorg-iceauth xorg-luit xorg-mkfontscale xorg-server xorg-server-common xorg-server-devel xorg-server-xephyr xorg-server-xnest xorg-server-xvfb xorg-server-xwayland xorg-sessreg xorg-setxkbmap xorg-smproxy xorg-x11perf xorg-xauth xorg-xbacklight xorg-xcmsdb xorg-xcursorgen xorg-xdpyinfo xorg-xdriinfo xorg-xev xorg-xgamma xorg-xhost xorg-xinput xorg-xkbcomp xorg-xkbevd xorg-xkbutils xorg-xkill xorg-xlsatoms xorg-xlsclients xorg-xmodmap xorg-xpr xorg-xprop xorg-xrandr xorg-xrdb xorg-xrefresh xorg-xset xorg-xsetroot xorg-xvinfo xorg-xwd xorg-xwininfo xorg-xwud xsane xsane-gimp yasm zip">$2
              elif [ "$(cat $1)" == "x86_64_xfce" ]; then
-                echo "bash bluez btrfs-progs bzip2 coreutils crda cryptsetup device-mapper dhcpcd dialog diffutils ffmpeg file filesystem findutils firefox gawk gettext gimp glibc gparted grep grub gvfs gvfs-afc gvfs-gphoto2 gvfs-mtp gvfs-smb gzip htop inetutils iproute2 iputils less licenses logrotate lvm2 lxdm man-db man-pages mc mdadm mousepad mpv nano netctl networkmanager nm-connection-editor network-manager-applet p7zip pacman pacman-mirrorlist pavucontrol psmisc pulseaudio-alsa samba sudo tar texinfo thunar thunar-archive-plugin thunar-volman unrar util-linux vi virtualbox-guest-modules-arch which xf86-input-evdev xf86-input-libinput xf86-input-synaptics xf86-input-void xf86-input-wacom xf86-video-fbdev xf86-video-vesa xf86-video-amdgpu xf86-video-ati xf86-video-intel xf86-video-nouveau xfce4-appfinder xfce4-artwork xfce4-battery-plugin xfce4-clipman-plugin xfce4-cpufreq-plugin xfce4-cpugraph-plugin xfce4-datetime-plugin xfce4-fsguard-plugin xfce4-genmon-plugin xfce4-mount-plugin xfce4-netload-plugin xfce4-notifyd xfce4-panel xfce4-power-manager xfce4-pulseaudio-plugin xfce4-screenshooter xfce4-sensors-plugin xfce4-session xfce4-settings xfce4-systemload-plugin xfce4-taskmanager xfce4-terminal xfce4-time-out-plugin xfce4-timer-plugin xfce4-verve-plugin xfce4-wavelan-plugin xfce4-whiskermenu-plugin xfce4-xkb-plugin xfdesktop xfwm4 xfwm4-themes xorg-fonts-100dpi xorg-fonts-75dpi xorg-iceauth xorg-luit xorg-server xorg-sessreg xorg-setxkbmap xorg-smproxy xorg-xauth xorg-xbacklight xorg-xcmsdb xorg-xcursorgen xorg-xdpyinfo xorg-xdriinfo xorg-xev xorg-xgamma xorg-xinput xorg-xkbevd xorg-xkbutils xorg-xkill xorg-xlsatoms xorg-xlsclients xorg-xmodmap xorg-xpr xorg-xprop xorg-xrandr xorg-xrdb xorg-xrefresh xorg-xset xorg-xsetroot xorg-xvinfo xorg-xwd xorg-xwininfo xorg-xwud zip">$2
+                echo "bash bluez btrfs-progs bzip2 coreutils crda cryptsetup device-mapper dhcpcd dialog diffutils ffmpeg file filesystem findutils firefox gawk gettext gimp glibc gparted grep grub gvfs gvfs-afc gvfs-gphoto2 gvfs-mtp gvfs-smb gzip htop inetutils iproute2 iputils less licenses logrotate lvm2 lxdm man-db man-pages mc mdadm mousepad mpv nano netctl networkmanager nm-connection-editor network-manager-applet p7zip pacman pacman-mirrorlist pavucontrol psmisc pulseaudio-alsa samba sudo tar texinfo thunar thunar-archive-plugin thunar-volman unrar util-linux vi which xf86-input-evdev xf86-input-libinput xf86-input-synaptics xf86-input-void xf86-input-wacom xf86-video-fbdev xf86-video-vesa xf86-video-amdgpu xf86-video-ati xf86-video-intel xf86-video-nouveau xfce4-appfinder xfce4-artwork xfce4-battery-plugin xfce4-clipman-plugin xfce4-cpufreq-plugin xfce4-cpugraph-plugin xfce4-datetime-plugin xfce4-fsguard-plugin xfce4-genmon-plugin xfce4-mount-plugin xfce4-netload-plugin xfce4-notifyd xfce4-panel xfce4-power-manager xfce4-pulseaudio-plugin xfce4-screenshooter xfce4-sensors-plugin xfce4-session xfce4-settings xfce4-systemload-plugin xfce4-taskmanager xfce4-terminal xfce4-time-out-plugin xfce4-timer-plugin xfce4-verve-plugin xfce4-wavelan-plugin xfce4-whiskermenu-plugin xfce4-xkb-plugin xfdesktop xfwm4 xfwm4-themes xorg-fonts-100dpi xorg-fonts-75dpi xorg-iceauth xorg-luit xorg-server xorg-sessreg xorg-setxkbmap xorg-smproxy xorg-xauth xorg-xbacklight xorg-xcmsdb xorg-xcursorgen xorg-xdpyinfo xorg-xdriinfo xorg-xev xorg-xgamma xorg-xinput xorg-xkbevd xorg-xkbutils xorg-xkill xorg-xlsatoms xorg-xlsclients xorg-xmodmap xorg-xpr xorg-xprop xorg-xrandr xorg-xrdb xorg-xrefresh xorg-xset xorg-xsetroot xorg-xvinfo xorg-xwd xorg-xwininfo xorg-xwud zip">$2
+            elif [ "$(cat $1)" == "pmlike" ]; then
+                echo "acl acpica a52dec aalib alsa-oss adwaita-icon-theme alsa-lib arandr alsa-plugins argon2 at-spi2-atk atkmm atk asunder arpwatch attr audacious audacious-plugins at-spi2-core bc audiofile gparted bash bar beautifulsoup4 blueman bind bleachbit bonnie++ boost bluez busybox bzip2 ca-certificates cabextract cairo cairomm cdrtools cdparanoia cgmanager clamtk chntpw clamav cifs-utils clonezilla coreutils cracklib cryptsetup cups-filters crypt-ssleay curl curlftpfs cyrus-sasl dash dbus-python dbus-glib dbus ddrescue dconf dconf-editor desktop-file-utils dhcp djvulibre dosbox drbl dmapi dstat dnsmasq e2fsprogs dump efibootmgr elinks emelfm2 encfs elfutils espeak ethtool espeakup evince expat expect exo exfat-utils extundelete file filezilla fatresize file-roller fftw findutils flac fltk freeglut foremost fontconfig fribidi fsarchiver freerdp freetype galculator fuse gc gawk gcr gdbm gettext gdk-pixbuf2 gd glew glib2 ghostscript giflib glu glibmm glib-networking glibc gmp gnome-disk-utility gnome-keyring gnupg gnutls gobject-introspection gpart gpgme gpm gptfdisk gphoto2 grub-customizer grsync grep gsettings-desktop-schemas gstreamer gtk2 gsl gst-plugins-base gtkmm3 gtk3 guile gzip guvcview gutenprint hardinfo hexchat harfbuzz hddtemp hexedit html5lib hplip idle3-tools icon-naming-utils idna inetd iputils iperf iproute2 iperf3 iptables jemalloc js185 jansson json-c json-glib kbd lbzip2 lame keyutils lastpass-cli kmod less lcms2 lftp leafpad libaio libao libarchive libasyncns libatasmart libassuan libcaca libburn libcanberra libcap libbsd libcap-ng libcddb libcdio libcdio-paranoia libcroco libdvdnav libepoxy libdrm libedit libevent libexif libevdev libewf libffi libfilezilla libfm libfontenc libgcrypt libglvnd libgpg-error libgnome-keyring libglade libical libgudev libgphoto2 libgtop libieee1284 libidn libid3tag libimobiledevice libksba libjpeg-turbo libisofs libldm libisoburn libmng libmad libmnl libmbim libnfnetlink libndp libmtp libnih libnftnl libnl libpcap libogg libnotify libpciaccess libpng libproxy libplist libpwquality librsync libqmi libsamplerate librsvg libsm libsigc++ libsecret libsndfile libsigsegv libssh libsoup libssh2 libspectre libtiff libtheora libtasn1 libtirpc libusb libusb-compat libunistring libunique libva libva-intel-driver libvdpau libusbmuxd libvisual libvncserver libvorbis libwnck libvisual-plugins libvpx libx86 libwww-perl libxaw libx11 libxau libxcomposite libxcursor libxcb libxdamage libxdmcp libxext libxfce4ui libxfixes libxfce4util libxfont2 libxi libxinerama libxkbcommon libxkbfile libxft libxrender libxmu libxpm libxml2 libxrandr libxshmfence libxslt libxt libxres libxtst libxv libyaml libxxf86vm lighttpd lm-sensors lxappearance-obconf-gtk3 lrzip lshw lxinput-gtk3 lsscsi lxpanel-gtk3 lxappearance-gtk3 lxml lxlauncher-gtk3 lxhotkey-gtk3 lxrandr-gtk3 lxtask-gtk3 lxinput-gtk3 lxsession-gtk3 lz4 pcmanfm-gtk3 lzo mate-power-manager mako mate-utils menu-cache mesa memtester mhash minicom nss mkfontscale mobile-broadband-provider-info modemmanager mpfr mtdev mplayer mtools multipath-tools mtpfs murrine nbd ncompress ncdu ncurses neon ncftp net-snmp net-tools net-ssleay netpbm nettle nfs-utils nilfs-utils network-manager-applet networkmanager-pptp ntfs ntp notification-daemon nmap numlockx nvme-cli openbox openssh openssl pango orc openvpn p11-kit pangomm parcellite parallel parted partclone partimage pbzip2 pavucontrol pciutils perl pcmanfm pcre perl-cairo-gobject perl-cairo perl-common-sense perl-carp-clan perl-bit-vector perl-date-calc perl-extutils-depends perl-encode-locale perl-digest-sha1 perl-digest-hmac perl-glib-object-introspection perl-file-find-rule perl-file-listing perl-extutils-pkgconfig perl-glib perl-gtk3 perl-http-cookies perl-html-tagset perl-gtk2 perl-html-parser perl-io-html perl-http-negotiate perl-http-message perl-http-date perl-http-daemon perl-json perl-lwp-mediatypes perl-lwp-protocol-https perl-json-xs perl-io-socket-ssl perl-net-ip perl-net-dns perl-mozilla-ca perl-net-libidn perl-net-http perl-test-exception perl-number-compare perl-text-csv perl-sub-uplevel perl-www-robotrules perl-text-glob pixman polkit poppler polarssl polkit-gnome ppp popt poppler-data powertop pptp pptpd procps-ng pth psensor progsreiserfs pv putty pulseaudio pycups pygobject pycurl pyparsing python-six python-certifi python-chardet python-pillow python-requests python-urllib3 python-setuptools python-webencodings pyudev qemu pyxdg fsarchiver read-edid rdesktop rdiff-backup quota redshift readline remmina rpcbind reptyr rlog safecopy ruby rp-pppoe screen sbc sane scite sed sdl2 sdl shadow setxkbmap shorewall-core shared-mime-info shake shorewall6 shorewall sleuthkit six slang smartmontools sqlite speexdsp squashfs-tools stress startup-notification ssr syslinux tar taglib tcplay testdisk tcl tigervnc tk tree transmission tmux tre udevil udisks truecrypt udisks2 unarj upower veracrypt v4l-utils util-linux wimlib wheel vte wavpack wmctrl wine wipe wxgtk3 wxpython x11vnc x264 xauth xcb-util xcb-util-cursor xcb-util-keysyms xcb-proto xcb-util-image xcb-util-renderutil xdg-user-dirs xdialog xcb-util-wm xdg-utils xev xdotool xf86-video-amdgpu xf86-input-wacom xf86-video-ati xf86-video-nouveau xf86-video-intel xf86-video-openchrome xf86-video-sisusb xf86-video-voodoo xfburn xf86-video-vmware xfsdump xfconf xhost xfsprogs xinit xkbutils xmodmap xlockmore xkbcomp xprop xrandr xset xpyb xterm xtrans xz xwd xwininfo zenity yad zlib zsync zstd">$2
             elif [ "$(cat $1)" == "ARM_303_xfce" ]; then
                 echo "alsa-firmware alsa-plugins alsa-tools alsa-utils audacity bash bluez btrfs-progs bzip2 coreutils crda cryptsetup device-mapper dhcpcd dialog diffutils ffmpeg file filesystem findutils firefox gawk gcc gcc-libs gettext gimp glibc gparted grep gtk-xfce-engine gvfs gvfs-afc gvfs-gphoto2 gvfs-mtp gvfs-smb gzip htop inetutils iproute2 iputils less libreoffice-fresh libva-mesa-driver licenses linux-armv7-chromebook logrotate lvm2 lxdm make man-db man-pages mc mdadm mesa-demos mesa-vdpau mousepad mpv mtools nano netctl p7zip pacman pacman-mirrorlist parole psmisc samba sudo tar tcl texinfo thunar thunar-archive-plugin thunar-volman unrar usbutils util-linux vi which xf86-input-evdev xf86-input-keyboard xf86-input-libinput xf86-input-mouse xf86-input-synaptics xf86-input-void xf86-input-wacom xf86-video-fbdev xf86-video-vesa xfce4-appfinder xfce4-artwork xfce4-battery-plugin xfce4-clipman-plugin xfce4-cpufreq-plugin xfce4-cpugraph-plugin xfce4-datetime-plugin xfce4-fsguard-plugin xfce4-genmon-plugin xfce4-mount-plugin xfce4-netload-plugin xfce4-notifyd xfce4-panel xfce4-power-manager xfce4-pulseaudio-plugin xfce4-screenshooter xfce4-sensors-plugin xfce4-session xfce4-settings xfce4-systemload-plugin xfce4-taskmanager xfce4-terminal xfce4-time-out-plugin xfce4-timer-plugin xfce4-verve-plugin xfce4-wavelan-plugin xfce4-whiskermenu-plugin xfce4-xkb-plugin xfdesktop xfwm4 xfwm4-themes xorg-fonts-100dpi xorg-fonts-75dpi xorg-iceauth xorg-luit xorg-server xorg-sessreg xorg-setxkbmap xorg-smproxy xorg-xauth xorg-xbacklight xorg-xcmsdb xorg-xcursorgen xorg-xdpyinfo xorg-xdriinfo xorg-xev xorg-xgamma xorg-xinput xorg-xkbevd xorg-xkbutils xorg-xkill xorg-xlsatoms xorg-xlsclients xorg-xmodmap xorg-xpr xorg-xprop xorg-xrandr xorg-xrdb xorg-xrefresh xorg-xset xorg-xsetroot xorg-xvinfo xorg-xwd xorg-xwininfo xorg-xwud yasm youtube-dl zip ">$2
             fi
@@ -851,7 +864,7 @@ if $(echo $tmp_parts_lst | grep -q "@/boot@")&&$(echo $tmp_parts_lst | grep -q "
         fi
     done
 fi
-## process other partitins
+## process other partitions
 tmp_parts_lst_luks=$tmp_parts_lst
 for tmp_cycle6 in $tmp_parts_lst; do
     if $(echo $tmp_cycle6 | grep -vq "luks"); then
@@ -963,9 +976,81 @@ runchr "$1"
 cp -f /mnt/$1 $1
 
 if [ -e /mnt/ignored.txt ];then
-    dialog --colors --title 'Unavailable packages' --msgbox "\n$(echo $(cat /mnt/ignored.txt)) \n\n\ZbIt seems the 'batchlist' a little bit outdated.\nYou can install alternatives manually after reboot.\Zn" '' ''
+    dialog --colors --title 'Unavailable packages' --msgbox "\n$(echo $(cat /mnt/ignored.txt)) \n\n\ZbIt seems the 'batchlist' a little bit outdated.\nYou can install alternatives manually or try without them.\Zn" '' ''
     clear
 fi
+
+## add a custom seletted packages
+dialog --defaultno --no-label " Skip it " --yesno 'You may add some packages to batch-list. Do you want to do it?' '' ''
+if [ $? -ne 1 ]; then
+    dialog --msgbox 'This is a very primitive packages selector. All it can do is add the selected package to the batch list. That is it. The packages are grouped in the same way as in the pacman database.' '' ''
+
+    paclist=$(mktemp XXXXXX.tmp)
+    repo_groups=$(mktemp XXXXXXX.tmp)
+    red_rgroups=$(mktemp XXXXXXX.tmp)
+    
+    echo get packages list
+    pacman -Ss >$repo_groups
+    echo grouping. it require a couple of sec. so dont panic
+    tmpcycle57_1=0
+    for tmpcycle57 in $(echo $(cat $repo_groups | grep --regexp="core/" --regexp="community/" --regexp="extra/" -n | sed 's/:.*//g')); do
+        if [ $tmpcycle57_1 -gt 0 ]; then
+            echo $(echo $(head -n $(($tmpcycle57-1)) $repo_groups | tail -n +$tmpcycle57_1))>>$paclist
+        fi
+        tmpcycle57_1=$tmpcycle57
+    done
+    echo $(echo $(tail -n +$tmpcycle57_1 $paclist))>>$paclist
+    echo ''>$repo_groups
+    
+    tmpmenuvar242='dialog --nocancel --checklist "Select repo to search" "" "" "" '
+    tmpmenuvar242+=$(mk_menu_list "core extra community" "on" "")
+    tmpmenuvar242+=' 2>"'"$1"'"'
+    eval $tmpmenuvar242
+    
+    cat $paclist | grep [$(cat $1 | sed 's/ /,/g')][/] | grep "(" | sed 's/.*(//g' | sed 's/).*//g' >$repo_groups
+    
+    echo ''>$red_rgroups
+    for ((tmpcycle57=1;$tmpcycle57 <= "$(wc -l $repo_groups | sed 's/ .*//g')";tmpcycle57++)); do
+        tmpvariable3495="$(head -n $tmpcycle57 $repo_groups | tail -n 1 | sed 's/ /@/g')"
+        if ! $(grep -xq "$tmpvariable3495" $red_rgroups); then
+            echo "$tmpvariable3495" >>$red_rgroups
+            echo "$tmpvariable3495"
+        fi
+    done
+    endselector=0
+    while [ $endselector -ne 1 ]; do
+        tmpmenuvar242='dialog --nocancel --radiolist "Select a groupe of packages or a searchbox" "" "" "" '
+        tmpmenuvar242+=$(mk_menu_list "!_SEARCHBOX $(echo $(cat $red_rgroups))" "on" "1")
+        tmpmenuvar242+=' 2>"'"$1"'"'
+        eval $tmpmenuvar242
+        
+        if [ "$(cat $1)" != "!_SEARCHBOX" ]; then
+            tmpmenuvar242='dialog --checklist "Select a packages" "" "" "" '
+            tmpmenuvar242+=$(mk_menu_list "$(echo $(cat $paclist | sed 's|core\/||g' | sed 's|extra\/||g' | sed 's|community\/||g' | grep "(""$(cat $1 | sed 's/@/ /g')"")" | sed 's/ .*//g'))" "" "")
+            tmpmenuvar242+=' 2>"'"$1"'"'
+            eval $tmpmenuvar242
+        else
+            dialog --no-cancel --title "Packages search box" --inputbox "\nWhat are you missing?\n\n(3 or more letters prefered)" '' '' "bash" 2>"$1"
+            
+            tmpmenuvar242='dialog --checklist "Select a packages" "" "" "" '
+            tmpmenuvar242+=$(mk_menu_list "$(echo $(cat $paclist | sed 's|core\/||g' | sed 's|extra\/||g' | sed 's|community\/||g' | grep "$(cat $1)" | sed 's/ .*//g'))" "" "")
+            tmpmenuvar242+=' 2>"'"$1"'"'
+            eval $tmpmenuvar242
+        fi
+        if $(cat $1 | grep -q [a-z]); then
+            for tmpcycle57 in $(echo $(cat $1)); do
+                if ! $(cat /mnt/$batchlist | grep -qx "$tmpcycle57"); then
+                    echo $tmpcycle57>>/mnt/$batchlist
+                fi
+            done
+        fi
+        dialog --yesno 'Exit from here?' '' ''
+        if [ $? -ne 1 ]; then endselector=1; fi
+    done
+    
+    rm -f $repo_groups $red_rgroups $paclist
+fi
+
 ## batch installation
 echo 'pacman -S $(echo $(cat '$1')) --noconfirm --needed' >/mnt/st2run
 runchr "$1"
@@ -1006,7 +1091,10 @@ dialog --nocancel --checklist 'Select tasks to perform' '' '' '' \
 "19" "set hw clock to localtime" "" \
 "20" "disable tmp in ram" "" \
 "21" "set all usb dev int affinity to 1 cpu core" "" \
-"22" "disable root" "on" 2>"$1"
+"22" "disable root" "on" \
+"23" "disable avahi-daemon.service" "" \
+"24" "disable lvm2-services" "" \
+"25" "disable systemd-journald.service" "" 2>"$1"
 clear
 if $(cat "$1" | grep -q "01"); then
     echo "gpasswd -a $user_name sys" >/mnt/st2run
@@ -1138,6 +1226,19 @@ WantedBy=multi-user.target
 fi
 if $(cat "$1" | grep -q "22"); then
     echo 'passwd -l root' >/mnt/st2run
+    runchr "$1"
+fi
+if $(cat "$1" | grep -q "23"); then
+    echo 'systemctl status avahi-daemon.service' >/mnt/st2run
+    runchr "$1"
+fi
+if $(cat "$1" | grep -q "24"); then
+    echo 'systemctl disable lvm2-lvmetad.service'>/mnt/st2run
+    echo 'systemctl disable lvm2-monitor.service' >>/mnt/st2run
+    runchr "$1"
+fi
+if $(cat "$1" | grep -q "25"); then
+    echo 'systemctl disable systemd-journald.service' >/mnt/st2run
     runchr "$1"
 fi
 echo "chown -R $user_name /home/$user_name" > /mnt/st2run
