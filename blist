@@ -969,7 +969,7 @@ echo ''>$1
 echo 'echo checking pkg availability
 tmp_max_thrd=$(($(grep "model name" /proc/cpuinfo --count)+1))
 tmp_thrd_count=0
-for i in $(cat packages.txt | grep -vx "$(pacman -Qqe)"); do
+for i in $(cat "'$batchlist'" | grep -vx "$(pacman -Qqe)"); do
     '$0' pkg_chk $i "'$1'" &
     tmp_thrd_count=$(($tmp_thrd_count+1))
     printf "."
@@ -993,78 +993,74 @@ if [ $? -ne 1 ]; then
     dialog --msgbox 'This is a very primitive packages selector. All it can do is add the selected package to the batch list. That is it. The packages are grouped in the same way as in the pacman database.' '' ''
 
     paclist=$(mktemp XXXXXX.tmp)
+    menustatus=$(mktemp XXXXXX.tmp)
     repo_groups=$(mktemp XXXXXXX.tmp)
     red_rgroups=$(mktemp XXXXXXX.tmp)
     
     echo get packages list
-    pacman -Ss >$repo_groups
-    echo reformating list. it may require a few min. dont panic
-    tmpcycle57_1=0
-    for tmpcycle57 in $(echo $(cat $repo_groups | grep --regexp="core/" --regexp="community/" --regexp="extra/" -n | sed 's/:.*//g')); do
-        if [ $tmpcycle57_1 -gt 0 ]; then
-            echo $(echo $(head -n $(($tmpcycle57-1)) $repo_groups | tail -n +$tmpcycle57_1))>>$paclist
-        fi
-        tmpcycle57_1=$tmpcycle57
-    done
-    echo $(echo $(tail -n +$tmpcycle57_1 $paclist))>>$paclist
-    echo ''>$repo_groups
+    echo -e $(echo $(pacman -Ss | sed 's@core\/@\\ncore\/@g' | sed 's@extra\/@\\nextra\/@g' | sed 's@community\/@\\ncommunity\/@g')) >$paclist
     
-    tmpmenuvar242='dialog --nocancel --checklist "Select repo to search" "" "" "" '
-    tmpmenuvar242+=$(mk_menu_list "core extra community" "on" "")
-    tmpmenuvar242+=' 2>"'"$1"'"'
-    eval $tmpmenuvar242
+    if [ "$(wc -l $paclist | sed 's/ .*//g')" -le 1000 ]; then
+        dialog --colors --title '\Z1Package selector fail' --msgbox '\nAdditional package could be installed after sytem installation complete.\Zn' '7' '45'
+        rm -f $menustatus $repo_groups $red_rgroups $paclist
+    else
     
-    cat $paclist | grep [$(cat $1 | sed 's/ /,/g')][/] | grep "(" | sed 's/.*(//g' | sed 's/).*//g' >$repo_groups
-    
-    echo ''>$red_rgroups
-    for ((tmpcycle57=1;$tmpcycle57 <= "$(wc -l $repo_groups | sed 's/ .*//g')";tmpcycle57++)); do
-        tmpvariable3495="$(head -n $tmpcycle57 $repo_groups | tail -n 1 | sed 's/ /@/g')"
-        if ! $(grep -xq "$tmpvariable3495" $red_rgroups); then
-            echo "$tmpvariable3495" >>$red_rgroups
-            echo "$tmpvariable3495"
-        fi
-    done
-    endselector=0
-    while [ $endselector -ne 1 ]; do
-        tmpmenuvar242='dialog --nocancel --radiolist "Select a groupe of packages or a searchbox" "" "" "" '
-        tmpmenuvar242+=$(mk_menu_list "!_SEARCHBOX $(echo $(cat $red_rgroups))" "on" "1")
-        tmpmenuvar242+=' 2>"'"$1"'"'
+        tmpmenuvar242='dialog --nocancel --checklist "Select repo to search" "" "" "" '
+        tmpmenuvar242+=$(mk_menu_list "core extra community" "on" "")
+        tmpmenuvar242+=' 2>"'"$menustatus"'"'
         eval $tmpmenuvar242
-        
-        if [ "$(cat $1)" != "!_SEARCHBOX" ]; then
-            tmpmenuvar242='dialog --checklist "Select a packages" "" "" "" '
-            tmpmenuvar242+=$(mk_menu_list "$(echo $(cat $paclist | sed 's|core\/||g' | sed 's|extra\/||g' | sed 's|community\/||g' | grep "(""$(cat $1 | sed 's/@/ /g')"")" | sed 's/ .*//g'))" "" "")
-            tmpmenuvar242+=' 2>"'"$1"'"'
-            eval $tmpmenuvar242
-        else
-            dialog --no-cancel --title "Packages search box" --inputbox "\nWhat are you missing?\n\n(3 or more letters prefered)" '' '' "bash" 2>"$1"
-            
-            tmpmenuvar242='dialog --checklist "Select a packages" "" "" "" '
-            tmpmenuvar242+=$(mk_menu_list "$(echo $(cat $paclist | sed 's|core\/||g' | sed 's|extra\/||g' | sed 's|community\/||g' | grep "$(cat $1)" | sed 's/ .*//g'))" "" "")
-            tmpmenuvar242+=' 2>"'"$1"'"'
-            eval $tmpmenuvar242
-        fi
-        if $(cat $1 | grep -q [a-z]); then
-            for tmpcycle57 in $(echo $(cat $1)); do
-                if ! $(cat /mnt/$batchlist | grep -qx "$tmpcycle57"); then
-                    echo $tmpcycle57>>/mnt/$batchlist
-                fi
-            done
-        fi
-        dialog --yesno 'Exit from here?' '' ''
-        if [ $? -ne 1 ]; then endselector=1; fi
-    done
     
-    rm -f $repo_groups $red_rgroups $paclist
+        cat $paclist | grep [$(cat $menustatus | sed 's/ /,/g')][/] | grep "(" | sed 's/.*(//g' | sed 's/).*//g' >$repo_groups
+    
+        echo ''>$red_rgroups
+        for ((tmpcycle57=1;$tmpcycle57 <= "$(wc -l $repo_groups | sed 's/ .*//g')";tmpcycle57++)); do
+            tmpvariable3495="$(head -n $tmpcycle57 $repo_groups | tail -n 1 | sed 's/ /@/g')"
+            if ! $(grep -xq "$tmpvariable3495" $red_rgroups); then
+                echo "$tmpvariable3495" >>$red_rgroups
+                echo "$tmpvariable3495"
+            fi
+        done
+   
+        endselector=0
+        while [ $endselector -ne 1 ]; do
+            tmpmenuvar242='dialog --nocancel --radiolist "Select a groupe of packages or a searchbox" "" "" "" '
+            tmpmenuvar242+=$(mk_menu_list "!_SEARCHBOX $(echo $(cat $red_rgroups))" "on" "1")
+            tmpmenuvar242+=' 2>"'"$menustatus"'"'
+            eval $tmpmenuvar242
+            
+            if [ "$(cat $menustatus)" != "!_SEARCHBOX" ]; then
+                tmpmenuvar242='dialog --checklist "Select a packages" "" "" "" '
+                tmpmenuvar242+=$(mk_menu_list "$(echo $(cat $paclist | sed 's|core\/||g' | sed 's|extra\/||g' | sed 's|community\/||g' | grep "(""$(cat $menustatus | sed 's/@/ /g')"")" | sed 's/ .*//g'))" "" "")
+                tmpmenuvar242+=' 2>"'"$menustatus"'"'
+                eval $tmpmenuvar242
+            else
+                dialog --no-cancel --title "Packages search box" --inputbox "\nWhat are you missing?\n\n(3 or more letters prefered)" '' '' "bash" 2>"$menustatus"
+                
+                tmpmenuvar242='dialog --checklist "Select a packages" "" "" "" '
+                tmpmenuvar242+=$(mk_menu_list "$(echo $(cat $paclist | sed 's|core\/||g' | sed 's|extra\/||g' | sed 's|community\/||g' | grep "$(cat $menustatus)" | sed 's/ .*//g'))" "" "")
+                tmpmenuvar242+=' 2>"'"$menustatus"'"'
+                eval $tmpmenuvar242
+            fi
+            if $(cat $menustatus | grep -q [a-z]); then
+                for tmpcycle57 in $(echo $(cat $menustatus)); do
+                    if ! $(cat /mnt/$batchlist | grep -q " $tmpcycle57 "); then
+                        pacsvar=$(echo $(cat /mnt/$batchlist))
+                        echo "$pacsvar $tmpcycle57">/mnt/$batchlist
+                    fi
+                done
+            fi
+            dialog --yesno 'Exit from here?' '' ''
+            if [ $? -ne 1 ]; then endselector=1; fi
+        done
+        
+        rm -f $menustatus $repo_groups $red_rgroups $paclist
+    fi
 fi
 
 ## batch installation
-echo ''>/mnt/st2run
-echo ' if ! $(yes --version | grep "GNU GPL" -q); then
-    pacman -S coreutils --noconfirm --needed
-fi
-yes | pacman -S $(echo $(cat '$1')) --noconfirm --needed' >/mnt/st2run
-#echo 'pacman -S $(echo $(cat '$1')) --noconfirm --needed' >/mnt/st2run
+cp -f "/mnt/$batchlist" "/mnt/$1"
+cp -f "/mnt/$1" "$1"
+echo 'pacman -S $(echo $(cat '$1')) --noconfirm --needed' >/mnt/st2run
 runchr "$1"
 
 dialog  --no-cancel --inputbox "Specify a user name" '' '' "user" 2>"$1"
