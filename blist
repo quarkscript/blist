@@ -30,7 +30,7 @@ if [ -z "$1" ]; then
     if [ "$(cat $exitstatus)" == "Make" ]; then
         $0 "mk_batch_list" "$exitstatus" "$batchlist" "g"
         rm -f $exitstatus
-        if [ -f $batchlist ]; then dialog --msgbox "$batchlist created" '5' '30'; fi
+        #if [ -f $batchlist ]; then dialog --msgbox "$batchlist created" '5' '30'; fi
         clear
         exit 0
     elif [ "$(cat $exitstatus)" == "Install" ]; then
@@ -664,13 +664,23 @@ elif $(echo "$1" | grep -q ntfs);then
     mkntfs -f -L "$tmp_part_label" $tmp_part_path
     tmp_fs_type=ntfs
 elif $(echo "$1" | grep -q f2fs);then
-    mkfs.f2fs -f -l "$tmp_part_label" $tmp_part_path
-    tmp_fs_type=f2fs
+    if $(echo "$1" | grep -q ',');then
+        for tmp_cycle7 in $(echo "$1" | sed "s/@/ /g" ); do
+            if $(echo $tmp_cycle7 | grep -q ',');then
+                tmpvar24=$(echo "$tmp_cycle7 " | sed 's/, //g')
+            fi
+        done
+        mkfs.f2fs -f -O $tmpvar24 -l "$tmp_part_label" $tmp_part_path
+        tmp_fs_type=f2fs
+    else
+        mkfs.f2fs -f -l "$tmp_part_label" $tmp_part_path
+        tmp_fs_type=f2fs
+    fi
 elif $(echo "$1" | grep -q btrfs);then
     mkfs.btrfs -f --label "$tmp_part_label" $tmp_part_path
     tmp_fs_type=btrfs
 elif $(echo "$1" | grep -q ext4);then
-    mke2fs -f -t ext4 -L "$tmp_part_label" $tmp_part_path
+    mke2fs -F -t ext4 -L "$tmp_part_label" $tmp_part_path
     tmp_fs_type=ext4
 elif $(echo "$1" | grep -q swap);then
     mkswap $tmp_part_path
@@ -812,6 +822,22 @@ while [ ! -z "$tmp_menu_cycle00" ]; do
                         parts_lst=$(echo $parts_lst | sed "s|$tune_part|$tune_part@$(echo $(cat $1))|g")
                 
                     fi
+                    if $(cat "$1" | grep -q "f2fs" ); then
+                        dialog  --colors --no-cancel --checklist 'f2fs provides some functionality, but these must be applied at formatting time.' '' '' '' 'encrypt' 'supp. for fs level encryption' '' 'extra_attr' 'extra attr feature' '' 'project_quota' 'project ID tracking' '' 'inode_checksum' 'inode checksum' '' 'flexible_inline_xattr' 'flexible inline xattr' '' 'quota' 'quotas' '' 'inode_crtime' 'inode creation time' '' 'lost_found' 'lost+found' '' 'sb_checksum' 'superblock checksum' '' 'casefold' 'casefolding  supp.; opt. flags can be passed with -C' '' 'compression' 'sup. for fs level compression' '' 2>"$1"
+                        if $(cat $1 | grep -e 'project_quota' -e 'inode_checksum' -e 'flexible_inline_xattr' -e 'inode_crtime' -e 'compression' -q ) && $(cat $1 | grep -vq extra_attr); then 
+                            tmpvar23="extra_attr "
+                            tmpvar23+=$(echo $(cat "$1"))
+                            echo $tmpvar23',' > "$1"
+                            tmpvar23=$(echo $(cat "$1") | sed 's/ /,/g')
+                            echo $tmpvar23 > "$1"
+                        elif [ "$(cat $1)" == "" ]; then
+                            tmpvar23=''
+                        else
+                            tmpvar23=$(echo $(cat "$1")',')
+                            echo $(echo $tmpvar23) | sed 's/ /,/g'> "$1"
+                        fi
+                        parts_lst=$(echo $parts_lst | sed "s|$tune_part|$tune_part@$(echo $(cat $1))|g")
+                    fi
                 elif $(cat "$1" | grep -xq luks)&&$(echo $tune_part | grep -vq luks); then
                     if [ ! -s "$luks_tests" ]; then
                         clear
@@ -845,7 +871,23 @@ while [ ! -z "$tmp_menu_cycle00" ]; do
                     if $(cat "$1" | grep -q "btrfs" ); then
                         dialog  --no-cancel --radiolist 'Specify compression options for btrfs filesystem.\n\nFilesystem compression could save some space and increase reaction speed of operating system even for SSD, but it require a high (single thread) performance of CPU ' '' '' '' 'zlib' 'default, slow' '' 'zlib:9' 'high compr., very slow' '' 'zstd' 'much faster decompr.' '' 'zstd:13' 'high compression' '' 'do_not_compress' '' 'on' 2>"$1"
                         parts_lst=$(echo $parts_lst | sed "s|$tune_part|$tune_part@$(echo $(cat $1))|g")
-                
+                    fi
+                    
+                    if $(cat "$1" | grep -q "f2fs" ); then
+                        dialog  --colors --no-cancel --checklist 'f2fs provides some functionality, but these must be applied at formatting time.' '' '' '' 'encrypt' 'supp. for fs level encryption' '' 'extra_attr' 'extra attr feature' '' 'project_quota' 'project ID tracking' '' 'inode_checksum' 'inode checksum' '' 'flexible_inline_xattr' 'flexible inline xattr' '' 'quota' 'quotas' '' 'inode_crtime' 'inode creation time' '' 'lost_found' 'lost+found' '' 'sb_checksum' 'superblock checksum' '' 'casefold' 'casefolding  supp.; opt. flags can be passed with -C' '' 'compression' 'sup. for fs level compression' '' 2>"$1"
+                        if $(cat $1 | grep -e 'project_quota' -e 'inode_checksum' -e 'flexible_inline_xattr' -e 'inode_crtime' -e 'compression' -q ) && $(cat $1 | grep -vq extra_attr); then 
+                            tmpvar23="extra_attr "
+                            tmpvar23+=$(echo $(cat "$1"))
+                            echo $tmpvar23',' > "$1"
+                            tmpvar23=$(echo $(cat "$1") | sed 's/ /,/g')
+                            echo $tmpvar23 > "$1"
+                        elif [ "$(cat $1)" == "" ]; then
+                            tmpvar23=''
+                        else
+                            tmpvar23=$(echo $(cat "$1")',')
+                            echo $(echo $tmpvar23) | sed 's/ /,/g'> "$1"
+                        fi
+                        parts_lst=$(echo $parts_lst | sed "s|$tune_part|$tune_part@$(echo $(cat $1))|g")
                     fi
                 fi
             fi
@@ -857,7 +899,7 @@ for tmp_cycle6 in $parts_lst; do
     if $(echo $tmp_cycle6 | grep -q "@/@"); then
         clear
         ft_n_mt "$tmp_cycle6" "$diskpath"
-        tmp_parts_lst=$(echo $parts_lst | sed "s|$tmp_cycle6 ||g")
+        tmp_parts_lst=$(echo $parts_lst | sed "s|$tmp_cycle6||g")
     fi
 done
 ## if boot and bootefi existed make boot first
