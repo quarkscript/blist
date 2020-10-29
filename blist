@@ -51,10 +51,8 @@ if [ -z "$1" ]; then
         if ! $(mount | grep -q "/mnt"); then dialog --title 'Error' --colors --msgbox "\Z1Nothing mounted to /mnt. Installation fail.\n\n\ZnYou need to select a partition for '/' on 'Simple disk formatter and mounter' menu or mount the future root partition to /mnt manually before executing $0" '' ''; rm -f $exitstatus; exit 0; fi
         
         clear
-        pacstrap /mnt base 
-        genfstab -U /mnt >> /mnt/etc/fstab 
+        $0 step1 "$exitstatus"
         
-        cp -f $batchlist /mnt/$batchlist
         tmp_mscrname=$(echo $0 | sed 's|\.||g' | sed 's|\/||g')
         if [ -f "$tmp_mscrname" ]; then cp -f $tmp_mscrname /mnt/$tmp_mscrname
         else
@@ -62,7 +60,8 @@ if [ -z "$1" ]; then
         fi
         chmod +x /mnt/$tmp_mscrname
         
-        #echo '' > /mnt/$exitstatus
+        echo '' > $exitstatus
+        echo '' > /mnt/$exitstatus
         #echo -e "\n./$tmp_mscrname 'step2' '$exitstatus'" | arch-chroot /mnt
         $0 step2 "$exitstatus"
         rm -f /mnt/$exitstatus
@@ -127,15 +126,15 @@ elif [ "$3" == "t" ]; then
     if [ "$(cat $1)" != 1 ]; then
         dialog  --no-cancel --ok-label agree --radiolist "Warning! '$2' does not found A new '$2' will be created from template. Wich template do you want to use?" '' '' '' 'x86_64_plasma' '- plasma desktop + libreoffice + firefox...' on 'x86_64_xfce' '- xfce desktop + firefox...' '' 'x86_64_lxqt' '- lxqt desktop only' '' 'x86_64_pmlike' '- xfce + fs/disks utils' '' 'ARM_303_xfce' '- xfce desktop on ARMv7hf xe303c12 chromebook' '' 2>$1
             if [ "$(cat $1)" == "x86_64_plasma" ]; then
-                echo "acpi acpid alsa-utils ark mkinitcpio discover audacity autoconf automake avidemux-qt bash binutils bison bluedevil bluez-cups bluez-hid2hci bluez-utils botan btrfs-progs bzip2 cdrdao cmake conky coreutils crda cryptsetup cups cups-pdf device-mapper dhcpcd dialog diffutils dolphin dosfstools dvd+rw-tools e2fsprogs ecryptfs-utils ed f2fs-tools faac fakeroot file filesystem findutils firefox firefox-i18n-ru firefox-i18n-uk flex foomatic-db-engine gawk gcc gcc-libs gettext gimp git glibc gparted grep grub gsmartcontrol gst-libav gst-plugins-good gst-plugins-ugly gstreamer-vaapi gwenview gzip hidapi imake inetutils iproute2 iputils iw k3b kate kcalc kdegraphics-mobipocket kdenetwork-filesharing kimageformats konsole krita kscreen kwalletmanager ladspa less libmirage libreoffice-fresh libreoffice-fresh-ru libreoffice-fresh-uk libtool libva-vdpau-driver libvdpau-va-gl licenses linux linux-headers logrotate lvm2 m4 make man-db man-pages mc mdadm mediainfo mkvtoolnix-gui nano netctl networkmanager networkmanager-openvpn networkmanager-qt noto-fonts-cjk noto-fonts-emoji ntfs-3g nvidia-dkms nvidia-settings ocl-icd okular opencl-headers opencl-nvidia os-prober p7zip packagekit-qt5 pacman patch pciutils perl pigz plasma-desktop plasma-nm plasma-pa powerdevil procps-ng psmisc psutils pulseaudio-alsa pulseaudio-bluetooth qt5-connectivity qt5-imageformats qt5-serialport qt5-virtualkeyboard ragel rcs samba sddm sddm-kcm sed shadow sudo sysfsutils systemd-sysvcompat tar texinfo thunderbird thunderbird-i18n-ru thunderbird-i18n-uk transcode transmission-qt ufw uget unrar unzip usbutils user-manager util-linux vcdimager vi vlc wget which wireless-regdb xf86-input-evdev xf86-input-libinput xf86-input-synaptics xf86-input-vmmouse xf86-input-void xf86-video-ati xf86-video-dummy xf86-video-fbdev xf86-video-vesa xf86-video-amdgpu xf86-video-ati xf86-video-intel xf86-video-nouveau xmlto xorg-bdftopcf xorg-docs xorg-font-util xorg-fonts-100dpi xorg-fonts-75dpi xorg-fonts-cyrillic xorg-fonts-encodings xorg-iceauth xorg-luit xorg-mkfontscale xorg-server xorg-server-common xorg-server-devel xorg-server-xephyr xorg-server-xnest xorg-server-xvfb xorg-server-xwayland xorg-sessreg xorg-setxkbmap xorg-smproxy xorg-x11perf xorg-xauth xorg-xbacklight xorg-xcmsdb xorg-xcursorgen xorg-xdpyinfo xorg-xdriinfo xorg-xev xorg-xgamma xorg-xhost xorg-xinput xorg-xkbcomp xorg-xkbevd xorg-xkbutils xorg-xkill xorg-xlsatoms xorg-xlsclients xorg-xmodmap xorg-xpr xorg-xprop xorg-xrandr xorg-xrdb xorg-xrefresh xorg-xset xorg-xsetroot xorg-xvinfo xorg-xwd xorg-xwininfo xorg-xwud xsane xsane-gimp yasm zip">$2
+                echo "acpi acpid alsa-utils ark mkinitcpio discover audacity autoconf automake avidemux-qt bash binutils bison bluedevil bluez-cups bluez-hid2hci bluez-utils botan btrfs-progs bzip2 cdrdao cmake conky coreutils crda cryptsetup cups cups-pdf device-mapper dhcpcd dialog diffutils dolphin dosfstools dvd+rw-tools e2fsprogs ecryptfs-utils ed f2fs-tools faac fakeroot file filesystem findutils firefox firefox-i18n-ru firefox-i18n-uk flex foomatic-db-engine gawk gcc gcc-libs gettext gimp git glibc gparted grep grub gsmartcontrol gst-libav gst-plugins-good gst-plugins-ugly gstreamer-vaapi gwenview gzip hidapi imake inetutils iproute2 iputils iw k3b kate kcalc kdegraphics-mobipocket kdenetwork-filesharing kimageformats konsole krita kscreen kwalletmanager ladspa less libmirage libreoffice-fresh libreoffice-fresh-ru libreoffice-fresh-uk libtool libva-vdpau-driver libvdpau-va-gl licenses linux linux-headers logrotate lvm2 m4 make man-db man-pages mc mdadm mediainfo mkvtoolnix-gui nano netctl networkmanager networkmanager-openvpn networkmanager-qt noto-fonts-cjk noto-fonts-emoji ntfs-3g nvidia-dkms nvidia-settings ocl-icd okular opencl-headers opencl-nvidia os-prober p7zip packagekit-qt5 pacman patch pciutils perl pigz plasma-desktop plasma-nm plasma-pa powerdevil procps-ng psmisc psutils pulseaudio-alsa pulseaudio-bluetooth qt5-connectivity qt5-imageformats qt5-serialport qt5-virtualkeyboard ragel rcs samba sddm sddm-kcm sed shadow sudo sysfsutils systemd-sysvcompat tar texinfo thunderbird thunderbird-i18n-ru thunderbird-i18n-uk transcode transmission-qt ufw uget unrar unzip usbutils user-manager util-linux vcdimager vi vlc wget which wireless-regdb xf86-input-evdev xf86-input-libinput xf86-input-synaptics xf86-input-vmmouse xf86-input-void xf86-video-ati xf86-video-dummy xf86-video-fbdev xf86-video-vesa xf86-video-amdgpu xf86-video-ati xf86-video-intel xf86-video-nouveau xmlto xorg-bdftopcf xorg-docs xorg-font-util xorg-fonts-100dpi xorg-fonts-75dpi xorg-fonts-cyrillic xorg-fonts-encodings xorg-iceauth xorg-mkfontscale xorg-server xorg-server-common xorg-server-devel xorg-server-xephyr xorg-server-xnest xorg-server-xvfb xorg-server-xwayland xorg-sessreg xorg-setxkbmap xorg-smproxy xorg-x11perf xorg-xauth xorg-xbacklight xorg-xcmsdb xorg-xcursorgen xorg-xdpyinfo xorg-xdriinfo xorg-xev xorg-xgamma xorg-xhost xorg-xinput xorg-xkbcomp xorg-xkbevd xorg-xkbutils xorg-xkill xorg-xlsatoms xorg-xlsclients xorg-xmodmap xorg-xpr xorg-xprop xorg-xrandr xorg-xrdb xorg-xrefresh xorg-xset xorg-xsetroot xorg-xvinfo xorg-xwd xorg-xwininfo xorg-xwud xsane xsane-gimp yasm zip">$2
              elif [ "$(cat $1)" == "x86_64_xfce" ]; then
-                echo "base bluez btrfs-progs crda dhcpcd dialog diffutils f2fs-tools ffmpeg firefox gimp gparted grub gvfs gvfs-afc gvfs-gphoto2 gvfs-mtp gvfs-smb htop inetutils linux logrotate lvm2 lxdm man-db man-pages mc mdadm mkinitcpio mousepad mpv nano netctl network-manager-applet networkmanager nm-connection-editor os-prober p7zip pavucontrol pulseaudio-alsa samba sudo texinfo thunar thunar-archive-plugin thunar-volman unrar vi which xf86-input-evdev xf86-input-libinput xf86-input-synaptics xf86-input-void xf86-input-wacom xf86-video-amdgpu xf86-video-ati xf86-video-fbdev xf86-video-intel xf86-video-nouveau xf86-video-vesa xfce4-appfinder xfce4-artwork xfce4-battery-plugin xfce4-clipman-plugin xfce4-cpufreq-plugin xfce4-cpugraph-plugin xfce4-datetime-plugin xfce4-fsguard-plugin xfce4-genmon-plugin xfce4-mount-plugin xfce4-netload-plugin xfce4-notifyd xfce4-panel xfce4-power-manager xfce4-pulseaudio-plugin xfce4-screenshooter xfce4-sensors-plugin xfce4-session xfce4-settings xfce4-systemload-plugin xfce4-taskmanager xfce4-terminal xfce4-time-out-plugin xfce4-timer-plugin xfce4-verve-plugin xfce4-wavelan-plugin xfce4-whiskermenu-plugin xfce4-xkb-plugin xfdesktop xfwm4 xfwm4-themes xorg-fonts-100dpi xorg-fonts-75dpi xorg-iceauth xorg-luit xorg-server xorg-sessreg xorg-setxkbmap xorg-smproxy xorg-xauth xorg-xbacklight xorg-xcmsdb xorg-xcursorgen xorg-xdpyinfo xorg-xdriinfo xorg-xev xorg-xgamma xorg-xinput xorg-xkbevd xorg-xkbutils xorg-xkill xorg-xlsatoms xorg-xlsclients xorg-xmodmap xorg-xpr xorg-xprop xorg-xrandr xorg-xrdb xorg-xrefresh xorg-xset xorg-xsetroot xorg-xvinfo xorg-xwd xorg-xwininfo xorg-xwud zip ">$2
+                echo "base bluez btrfs-progs crda dhcpcd dialog diffutils f2fs-tools ffmpeg firefox gimp gparted grub gvfs gvfs-afc gvfs-gphoto2 gvfs-mtp gvfs-smb htop inetutils linux logrotate lvm2 lxdm man-db man-pages mc mdadm mkinitcpio mousepad mpv nano netctl network-manager-applet networkmanager nm-connection-editor os-prober p7zip pavucontrol pulseaudio-alsa samba sudo texinfo thunar thunar-archive-plugin thunar-volman unrar vi which xf86-input-evdev xf86-input-libinput xf86-input-synaptics xf86-input-void xf86-input-wacom xf86-video-amdgpu xf86-video-ati xf86-video-fbdev xf86-video-intel xf86-video-nouveau xf86-video-vesa xfce4-appfinder xfce4-artwork xfce4-battery-plugin xfce4-clipman-plugin xfce4-cpufreq-plugin xfce4-cpugraph-plugin xfce4-datetime-plugin xfce4-fsguard-plugin xfce4-genmon-plugin xfce4-mount-plugin xfce4-netload-plugin xfce4-notifyd xfce4-panel xfce4-power-manager xfce4-pulseaudio-plugin xfce4-screenshooter xfce4-sensors-plugin xfce4-session xfce4-settings xfce4-systemload-plugin xfce4-taskmanager xfce4-terminal xfce4-time-out-plugin xfce4-timer-plugin xfce4-verve-plugin xfce4-wavelan-plugin xfce4-whiskermenu-plugin xfce4-xkb-plugin xfdesktop xfwm4 xfwm4-themes xorg-fonts-100dpi xorg-fonts-75dpi xorg-iceauth xorg-server xorg-sessreg xorg-setxkbmap xorg-smproxy xorg-xauth xorg-xbacklight xorg-xcmsdb xorg-xcursorgen xorg-xdpyinfo xorg-xdriinfo xorg-xev xorg-xgamma xorg-xinput xorg-xkbevd xorg-xkbutils xorg-xkill xorg-xlsatoms xorg-xlsclients xorg-xmodmap xorg-xpr xorg-xprop xorg-xrandr xorg-xrdb xorg-xrefresh xorg-xset xorg-xsetroot xorg-xvinfo xorg-xwd xorg-xwininfo xorg-xwud zip ">$2
             elif [ "$(cat $1)" == "x86_64_lxqt" ]; then
-                echo "acpi acpid alsa-firmware alsa-utils b43-fwcutter base btrfs-progs cifs-utils crda dhclient dhcpcd dialog diffutils dmraid ecryptfs-utils f2fs-tools grub haveged inetutils liblxqt linux linux-firmware linux-headers logrotate lximage-qt lxqt-about lxqt-admin lxqt-archiver lxqt-config lxqt-globalkeys lxqt-notificationd lxqt-openssh-askpass lxqt-panel lxqt-policykit lxqt-powermanagement lxqt-qtplugin lxqt-runner lxqt-session lxqt-sudo lxqt-themes man-db man-pages mdadm mkinitcpio nano net-tools network-manager-applet networkmanager-qt nm-connection-editor ntfs-3g obconf-qt openbox openssh os-prober pcmanfm-qt powertop pulseaudio-alsa reflector rsync s-nail screengrab sddm sudo sysfsutils syslog-ng texinfo usbutils which wpa_supplicant xdg-user-dirs xdg-utils xf86-input-vmmouse xf86-video-amdgpu xf86-video-ati xf86-video-dummy xf86-video-fbdev xf86-video-intel xf86-video-nouveau xf86-video-openchrome xf86-video-sisusb xf86-video-vesa xf86-video-vmware xf86-video-voodoo xorg-iceauth xorg-luit xorg-server xorg-sessreg xorg-setxkbmap xorg-smproxy xorg-xauth xorg-xbacklight xorg-xcmsdb xorg-xcursorgen xorg-xdpyinfo xorg-xdriinfo xorg-xev xorg-xgamma xorg-xinit xorg-xinput xorg-xkbevd xorg-xkbutils xorg-xkill xorg-xlsatoms xorg-xlsclients xorg-xmodmap xorg-xpr xorg-xprop xorg-xrandr xorg-xrdb xorg-xrefresh xorg-xset xorg-xsetroot xorg-xvinfo xorg-xwd xorg-xwininfo xorg-xwud xterm zip ">$2
+                echo "acpi acpid alsa-firmware alsa-utils b43-fwcutter base btrfs-progs cifs-utils crda dhclient dhcpcd dialog diffutils dmraid ecryptfs-utils f2fs-tools grub haveged inetutils liblxqt linux linux-firmware linux-headers logrotate lximage-qt lxqt-about lxqt-admin lxqt-archiver lxqt-config lxqt-globalkeys lxqt-notificationd lxqt-openssh-askpass lxqt-panel lxqt-policykit lxqt-powermanagement lxqt-qtplugin lxqt-runner lxqt-session lxqt-sudo lxqt-themes man-db man-pages mdadm mkinitcpio nano net-tools network-manager-applet networkmanager-qt nm-connection-editor ntfs-3g obconf-qt openbox openssh os-prober pcmanfm-qt powertop pulseaudio-alsa reflector rsync s-nail screengrab sddm sudo sysfsutils syslog-ng texinfo usbutils which wpa_supplicant xdg-user-dirs xdg-utils xf86-input-vmmouse xf86-video-amdgpu xf86-video-ati xf86-video-dummy xf86-video-fbdev xf86-video-intel xf86-video-nouveau xf86-video-openchrome xf86-video-sisusb xf86-video-vesa xf86-video-vmware xf86-video-voodoo xorg-iceauth xorg-server xorg-sessreg xorg-setxkbmap xorg-smproxy xorg-xauth xorg-xbacklight xorg-xcmsdb xorg-xcursorgen xorg-xdpyinfo xorg-xdriinfo xorg-xev xorg-xgamma xorg-xinit xorg-xinput xorg-xkbevd xorg-xkbutils xorg-xkill xorg-xlsatoms xorg-xlsclients xorg-xmodmap xorg-xpr xorg-xprop xorg-xrandr xorg-xrdb xorg-xrefresh xorg-xset xorg-xsetroot xorg-xvinfo xorg-xwd xorg-xwininfo xorg-xwud xterm zip ">$2
             elif [ "$(cat $1)" == "x86_64_pmlike" ]; then
-                echo "afpfs-ng avfs base bleachbit bluez bonnie++ btfs btrfs-progs cabextract cdrtools cgmanager chntpw cifs-utils clonezilla compsize crda cryfs curlftpfs cyrus-sasl dash davfs2 ddrescue dhcpcd dialog diffutils dmapi dmg2img dracut dstat duperemove ecryptfs-utils efibootmgr elfutils emelfm2 encfs ethtool evince exfat-utils expect extundelete f2fs-tools fatresize ffmpeg file-roller firefox foremost freerdp fsarchiver fscrypt fuse-overlayfs galculator gcr gd glusterfs gnome-disk-utility gocryptfs gpart gparted gphoto2 grsync grub grub-customizer guvcview hardinfo hddtemp hexchat hexedit htop idle3-tools inetutils iperf iperf3 jfsutils kbfs lastpass-cli leafpad lftp libbsd libcaca libewf libgtop libieee1284 libisoburn libisofs libldm libmbim libmng libndp libplist libqmi libusbmuxd linux logrotate lshw lsscsi lvm2 lxcfs lxdm man-db man-pages mate-utils mbedtls mc mdadm memtester mhash minicom mkinitcpio mousepad mpv mtools mtpfs multipath-tools nano nbd ncdu ncftp ncompress net-tools netctl netpbm network-manager-applet networkmanager networkmanager-pptp nfs-utils nm-connection-editor nmap notification-daemon ntp nvme-cli openvpn os-prober p7zip parallel pavucontrol pcmanfm-gtk3 poppler-data powertop psensor pth pulseaudio-alsa putty pv rdesktop rdiff-backup read-edid remmina reptyr rp-pppoe s3fs-fuse samba sane sbc scite shake sleuthkit smartmontools smbnetfs snapper squashfs-tools squashfuse stress sudo syslinux taglib tcplay testdisk texinfo thunar thunar-archive-plugin thunar-volman tigervnc tk tmux tree truecrypt udevil unrar veracrypt vi which wimlib wipe x11vnc xdialog xf86-input-evdev xf86-input-libinput xf86-input-synaptics xf86-input-void xf86-input-wacom xf86-video-amdgpu xf86-video-ati xf86-video-fbdev xf86-video-intel xf86-video-nouveau xf86-video-vesa xfburn xfce4-appfinder xfce4-artwork xfce4-battery-plugin xfce4-clipman-plugin xfce4-cpufreq-plugin xfce4-cpugraph-plugin xfce4-datetime-plugin xfce4-fsguard-plugin xfce4-genmon-plugin xfce4-mount-plugin xfce4-netload-plugin xfce4-notifyd xfce4-panel xfce4-power-manager xfce4-pulseaudio-plugin xfce4-screenshooter xfce4-sensors-plugin xfce4-session xfce4-settings xfce4-systemload-plugin xfce4-taskmanager xfce4-terminal xfce4-time-out-plugin xfce4-timer-plugin xfce4-verve-plugin xfce4-wavelan-plugin xfce4-whiskermenu-plugin xfce4-xkb-plugin xfdesktop xfsdump xfwm4 xfwm4-themes xorg-fonts-100dpi xorg-fonts-75dpi xorg-iceauth xorg-luit xorg-server xorg-sessreg xorg-setxkbmap xorg-smproxy xorg-xauth xorg-xbacklight xorg-xcmsdb xorg-xcursorgen xorg-xdpyinfo xorg-xdriinfo xorg-xev xorg-xgamma xorg-xinput xorg-xkbevd xorg-xkbutils xorg-xkill xorg-xlsatoms xorg-xlsclients xorg-xmodmap xorg-xpr xorg-xprop xorg-xrandr xorg-xrdb xorg-xrefresh xorg-xset xorg-xsetroot xorg-xvinfo xorg-xwd xorg-xwininfo xorg-xwud yad zip zsync">$2
+                echo "afpfs-ng avfs base bleachbit bluez bonnie++ btfs btrfs-progs cabextract cdrtools cgmanager chntpw cifs-utils clonezilla compsize crda cryfs curlftpfs cyrus-sasl dash davfs2 ddrescue dhcpcd dialog diffutils dmapi dmg2img dracut dstat duperemove ecryptfs-utils efibootmgr elfutils emelfm2 encfs ethtool evince exfat-utils expect extundelete f2fs-tools fatresize ffmpeg file-roller firefox foremost freerdp fsarchiver fscrypt fuse-overlayfs galculator gcr gd glusterfs gnome-disk-utility gocryptfs gpart gparted gphoto2 grsync grub grub-customizer guvcview hardinfo hddtemp hexchat hexedit htop idle3-tools inetutils iperf iperf3 jfsutils kbfs lastpass-cli leafpad lftp libbsd libcaca libewf libgtop libieee1284 libisoburn libisofs libldm libmbim libmng libndp libplist libqmi libusbmuxd linux logrotate lshw lsscsi lvm2 lxcfs lxdm man-db man-pages mate-utils mbedtls mc mdadm memtester mhash minicom mkinitcpio mousepad mpv mtools mtpfs multipath-tools nano nbd ncdu ncftp ncompress net-tools netctl netpbm network-manager-applet networkmanager networkmanager-pptp nfs-utils nm-connection-editor nmap notification-daemon ntp nvme-cli openvpn os-prober p7zip parallel pavucontrol pcmanfm-gtk3 poppler-data powertop psensor pth pulseaudio-alsa putty pv rdesktop rdiff-backup read-edid remmina reptyr rp-pppoe s3fs-fuse samba sane sbc scite shake sleuthkit smartmontools smbnetfs snapper squashfs-tools squashfuse stress sudo syslinux taglib tcplay testdisk texinfo thunar thunar-archive-plugin thunar-volman tigervnc tk tmux tree truecrypt udevil unrar veracrypt vi which wimlib wipe x11vnc xdialog xf86-input-evdev xf86-input-libinput xf86-input-synaptics xf86-input-void xf86-input-wacom xf86-video-amdgpu xf86-video-ati xf86-video-fbdev xf86-video-intel xf86-video-nouveau xf86-video-vesa xfburn xfce4-appfinder xfce4-artwork xfce4-battery-plugin xfce4-clipman-plugin xfce4-cpufreq-plugin xfce4-cpugraph-plugin xfce4-datetime-plugin xfce4-fsguard-plugin xfce4-genmon-plugin xfce4-mount-plugin xfce4-netload-plugin xfce4-notifyd xfce4-panel xfce4-power-manager xfce4-pulseaudio-plugin xfce4-screenshooter xfce4-sensors-plugin xfce4-session xfce4-settings xfce4-systemload-plugin xfce4-taskmanager xfce4-terminal xfce4-time-out-plugin xfce4-timer-plugin xfce4-verve-plugin xfce4-wavelan-plugin xfce4-whiskermenu-plugin xfce4-xkb-plugin xfdesktop xfsdump xfwm4 xfwm4-themes xorg-fonts-100dpi xorg-fonts-75dpi xorg-iceauth xorg-server xorg-sessreg xorg-setxkbmap xorg-smproxy xorg-xauth xorg-xbacklight xorg-xcmsdb xorg-xcursorgen xorg-xdpyinfo xorg-xdriinfo xorg-xev xorg-xgamma xorg-xinput xorg-xkbevd xorg-xkbutils xorg-xkill xorg-xlsatoms xorg-xlsclients xorg-xmodmap xorg-xpr xorg-xprop xorg-xrandr xorg-xrdb xorg-xrefresh xorg-xset xorg-xsetroot xorg-xvinfo xorg-xwd xorg-xwininfo xorg-xwud yad zip zsync">$2
             elif [ "$(cat $1)" == "ARM_303_xfce" ]; then
-                echo "alsa-firmware alsa-plugins alsa-tools alsa-utils audacity bash bluez btrfs-progs bzip2 coreutils crda cryptsetup device-mapper dhcpcd dialog diffutils ffmpeg file filesystem findutils firefox gawk gcc gcc-libs gettext gimp glibc gparted grep gtk-xfce-engine gvfs gvfs-afc gvfs-gphoto2 gvfs-mtp gvfs-smb gzip htop inetutils iproute2 iputils less libreoffice-fresh libva-mesa-driver licenses linux-armv7-chromebook logrotate lvm2 lxdm make man-db man-pages mc mdadm mesa-demos mesa-vdpau mousepad mpv mtools nano netctl p7zip pacman pacman-mirrorlist parole psmisc samba sudo tar tcl texinfo thunar thunar-archive-plugin thunar-volman unrar usbutils util-linux vi which xf86-input-evdev xf86-input-keyboard xf86-input-libinput xf86-input-mouse xf86-input-synaptics xf86-input-void xf86-input-wacom xf86-video-fbdev xf86-video-vesa xfce4-appfinder xfce4-artwork xfce4-battery-plugin xfce4-clipman-plugin xfce4-cpufreq-plugin xfce4-cpugraph-plugin xfce4-datetime-plugin xfce4-fsguard-plugin xfce4-genmon-plugin xfce4-mount-plugin xfce4-netload-plugin xfce4-notifyd xfce4-panel xfce4-power-manager xfce4-pulseaudio-plugin xfce4-screenshooter xfce4-sensors-plugin xfce4-session xfce4-settings xfce4-systemload-plugin xfce4-taskmanager xfce4-terminal xfce4-time-out-plugin xfce4-timer-plugin xfce4-verve-plugin xfce4-wavelan-plugin xfce4-whiskermenu-plugin xfce4-xkb-plugin xfdesktop xfwm4 xfwm4-themes xorg-fonts-100dpi xorg-fonts-75dpi xorg-iceauth xorg-luit xorg-server xorg-sessreg xorg-setxkbmap xorg-smproxy xorg-xauth xorg-xbacklight xorg-xcmsdb xorg-xcursorgen xorg-xdpyinfo xorg-xdriinfo xorg-xev xorg-xgamma xorg-xinput xorg-xkbevd xorg-xkbutils xorg-xkill xorg-xlsatoms xorg-xlsclients xorg-xmodmap xorg-xpr xorg-xprop xorg-xrandr xorg-xrdb xorg-xrefresh xorg-xset xorg-xsetroot xorg-xvinfo xorg-xwd xorg-xwininfo xorg-xwud yasm youtube-dl zip ">$2
+                echo "alsa-firmware alsa-plugins alsa-tools alsa-utils audacity bash bluez btrfs-progs bzip2 coreutils crda cryptsetup device-mapper dhcpcd dialog diffutils ffmpeg file filesystem findutils firefox gawk gcc gcc-libs gettext gimp glibc gparted grep gtk-xfce-engine gvfs gvfs-afc gvfs-gphoto2 gvfs-mtp gvfs-smb gzip htop inetutils iproute2 iputils less libreoffice-fresh libva-mesa-driver licenses linux-armv7-chromebook logrotate lvm2 lxdm make man-db man-pages mc mdadm mesa-demos mesa-vdpau mousepad mpv mtools nano netctl p7zip pacman pacman-mirrorlist parole psmisc samba sudo tar tcl texinfo thunar thunar-archive-plugin thunar-volman unrar usbutils util-linux vi which xf86-input-evdev xf86-input-keyboard xf86-input-libinput xf86-input-mouse xf86-input-synaptics xf86-input-void xf86-input-wacom xf86-video-fbdev xf86-video-vesa xfce4-appfinder xfce4-artwork xfce4-battery-plugin xfce4-clipman-plugin xfce4-cpufreq-plugin xfce4-cpugraph-plugin xfce4-datetime-plugin xfce4-fsguard-plugin xfce4-genmon-plugin xfce4-mount-plugin xfce4-netload-plugin xfce4-notifyd xfce4-panel xfce4-power-manager xfce4-pulseaudio-plugin xfce4-screenshooter xfce4-sensors-plugin xfce4-session xfce4-settings xfce4-systemload-plugin xfce4-taskmanager xfce4-terminal xfce4-time-out-plugin xfce4-timer-plugin xfce4-verve-plugin xfce4-wavelan-plugin xfce4-whiskermenu-plugin xfce4-xkb-plugin xfdesktop xfwm4 xfwm4-themes xorg-fonts-100dpi xorg-fonts-75dpi xorg-iceauth xorg-server xorg-sessreg xorg-setxkbmap xorg-smproxy xorg-xauth xorg-xbacklight xorg-xcmsdb xorg-xcursorgen xorg-xdpyinfo xorg-xdriinfo xorg-xev xorg-xgamma xorg-xinput xorg-xkbevd xorg-xkbutils xorg-xkill xorg-xlsatoms xorg-xlsclients xorg-xmodmap xorg-xpr xorg-xprop xorg-xrandr xorg-xrdb xorg-xrefresh xorg-xset xorg-xsetroot xorg-xvinfo xorg-xwd xorg-xwininfo xorg-xwud yasm youtube-dl zip ">$2
             fi
     fi
 elif [ "$3" == "e" ]; then
@@ -970,66 +969,12 @@ arch-chroot /mnt ./st2run
 ## next internal function ##
 ## ---------------------- ##
 
-step2(){
+step1(){
+## select pkgs and install system
 ## $1 - exitstatusfile
 
-echo ''>$1
-dialog  --no-cancel --inputbox "Specify a hostname" '' '' "test" 2>"$1"
-echo $(cat $1) > /mnt/etc/hostname
-
-echo ''>$1
-tmpvar01='dialog --no-cancel --radiolist "Select timezone" "" "" "" '
-tmpvar01+=$(mk_menu_list "$(echo $(find /mnt/usr/share/zoneinfo/ | sed 's|.*zoneinfo\/||g' | grep -v right| grep -v 'posix/' | grep "[A-Z]"))" "" "")
-tmpvar01+=' 2>"'"$1"'"'
-eval $tmpvar01
-if [ -f /mnt/etc/localtime ]; then rm -r /mnt/etc/localtime; fi
-ln -s /mnt/usr/share/zoneinfo/$(cat $1) /mnt/etc/localtime
-echo ''>$1
-tmpvar01='dialog --no-cancel --checklist "Select locales" "" "" "" '
-tmpvar01+='"en_US.UTF-8@UTF-8" "" "on" "uk_UA.UTF-8@UTF-8" "" "" "ru_RU.UTF-8@UTF-8" "" "" '
-tmpvar01+=$(mk_menu_list "$(echo $(cat /mnt/etc/locale.gen | grep "#[a-z,A-Z]" | sed 's/#//g' | sed 's/ /@/g' | sed 's/@@//g'))" "" "")
-tmpvar01+=' 2>"'"$1"'"'
-eval $tmpvar01
-echo 'tmpvar22=""
-for i in $(cat "'$1'"); do
-    tmpvar22=$(echo $i | sed "s/@/ /g")
-    if $(cat /etc/locale.gen | grep -q "$tmpvar22" ); then
-        '$0' f-ecf "/etc/locale.gen" "#$tmpvar22" "$tmpvar22"
-    else
-        echo $tmpvar22 >> /etc/locale.gen
-    fi
-done
-locale-gen' >/mnt/st2run
-clear
-runchr "$1"
-
-echo '' > "$1"
-echo "#pacman -Syu --noconfirm --needed
-if [ -f ignored.txt ]; then rm -f ignored.txt; fi" >/mnt/st2run
-runchr "$1"
-
-echo ''>$1
-## echo 'Search bad package from batch list' 
-echo 'echo checking pkg availability
-tmp_max_thrd=$(($(grep "model name" /proc/cpuinfo --count)+1))
-tmp_thrd_count=0
-for i in $(cat "'$batchlist'" | grep -vx "$(pacman -Qqe)"); do
-    '$0' pkg_chk $i "'$1'" &
-    tmp_thrd_count=$(($tmp_thrd_count+1))
-    printf "."
-    if [ $tmp_thrd_count -eq $tmp_max_thrd ]; then
-        tmp_thrd_count=0
-        wait
-    fi        
-done
-wait' >/mnt/st2run
-runchr "$1"
-cp -f /mnt/$1 /mnt/$batchlist
-
-if [ -e /mnt/ignored.txt ];then
-    dialog --colors --title 'Unavailable packages' --msgbox "\n$(echo $(cat /mnt/ignored.txt)) \n\n\ZbIt seems the 'batchlist' a little bit outdated.\nYou can install alternatives manually or try without them.\Zn" '' ''
-    clear
-fi
+pacman -Sy --noconfirm
+if [ -f ignored.txt ]; then rm -f ignored.txt; fi
 
 ## add a custom selected packages
 dialog --defaultno --no-label " Skip it " --yesno 'You may add some packages to batch-list. Do you want to do it?' '' ''
@@ -1074,22 +1019,22 @@ if [ $? -ne 1 ]; then
             
             if [ "$(cat $menustatus)" != "!_SEARCHBOX" ]; then
                 tmpmenuvar242='dialog --checklist "Select a packages" "" "" "" '
-                tmpmenuvar242+=$(mk_menu_list "$(echo $(cat $paclist | sed 's|core\/||g' | sed 's|extra\/||g' | sed 's|community\/||g' | grep "(""$(cat $menustatus | sed 's/@/ /g')"")" | sed 's/ .*//g'))" "" "")
+                tmpmenuvar242+=$(mk_menu_list "$(echo $(cat $paclist | sed 's|core\/||g' | sed 's|extra\/||g' | sed 's|community\/||g' | grep $(cat $menustatus | sed 's/@/ /g') | sed 's/ .*//g'))" "" "")
                 tmpmenuvar242+=' 2>"'"$menustatus"'"'
                 eval $tmpmenuvar242
             else
                 dialog --no-cancel --title "Packages search box" --inputbox "\nWhat are you missing?\n\n(3 or more letters prefered)" '' '' "bash" 2>"$menustatus"
                 
                 tmpmenuvar242='dialog --checklist "Select a packages" "" "" "" '
-                tmpmenuvar242+=$(mk_menu_list "$(echo $(cat $paclist | sed 's|core\/||g' | sed 's|extra\/||g' | sed 's|community\/||g' | grep "$(cat $menustatus)" | sed 's/ .*//g'))" "" "")
+                tmpmenuvar242+=$(mk_menu_list "$(echo $(cat $paclist | sed 's|core\/||g' | sed 's|extra\/||g' | sed 's|community\/||g' | grep $(cat $menustatus) | sed 's/ .*//g'))" "" "")
                 tmpmenuvar242+=' 2>"'"$menustatus"'"'
                 eval $tmpmenuvar242
             fi
             if $(cat $menustatus | grep -q [a-z]); then
                 for tmpcycle57 in $(echo $(cat $menustatus)); do
-                    if ! $(cat /mnt/$batchlist | grep -q " $tmpcycle57 "); then
-                        pacsvar=$(echo $(cat /mnt/$batchlist))
-                        echo "$pacsvar $tmpcycle57">/mnt/$batchlist
+                    if ! $(cat $batchlist | grep -q " $tmpcycle57 "); then
+                        pacsvar=$(echo $(cat $batchlist))
+                        echo "$pacsvar $tmpcycle57">$batchlist
                     fi
                 done
             fi
@@ -1101,10 +1046,72 @@ if [ $? -ne 1 ]; then
     fi
 fi
 
+echo ''>$1
+echo checking pkg availability
+tmp_max_thrd=$(($(grep "model name" /proc/cpuinfo --count)+1))
+tmp_thrd_count=0
+for i in $(cat "$batchlist" | grep -vx "$(pacman -Qqe)"); do
+    #$0 pkg_chk $i "$1" &
+    pkg_chk "$i" "$1" &
+    tmp_thrd_count=$(($tmp_thrd_count+1))
+    printf "."
+    if [ $tmp_thrd_count -eq $tmp_max_thrd ]; then
+        tmp_thrd_count=0
+        wait
+    fi        
+done
+wait
+cp -f $1 $batchlist
+
+if [ -e ignored.txt ];then
+    dialog --colors --title 'Unavailable packages' --msgbox "\n$(echo $(cat ignored.txt)) \n\n\ZbIt seems the 'batchlist' a little bit outdated.\nYou can install alternatives manually or try without them.\Zn" '' ''
+    cp -f ignored.txt /mnt/ignored.txt
+    clear
+fi
+cp -f $batchlist /mnt/$batchlist
+
 ## batch installation
-cp -f "/mnt/$batchlist" "/mnt/$1"
-cp -f "/mnt/$batchlist" "$1"
-echo 'pacman -S $(echo $(cat '$1')) --noconfirm --needed' >/mnt/st2run
+pacstrap /mnt base $(echo $(cat $batchlist))
+genfstab -U /mnt >> /mnt/etc/fstab
+}
+
+## ---------------------- ##
+## next internal function ##
+## ---------------------- ##
+
+
+step2(){
+## tune system
+## $1 - exitstatusfile
+
+echo ''>$1
+dialog  --no-cancel --inputbox "Specify a hostname" '' '' "test" 2>"$1"
+echo $(cat $1) > /mnt/etc/hostname
+
+echo ''>$1
+tmpvar01='dialog --no-cancel --radiolist "Select timezone" "" "" "" '
+tmpvar01+=$(mk_menu_list "$(echo $(find /mnt/usr/share/zoneinfo/ | sed 's|.*zoneinfo\/||g' | grep -v right| grep -v 'posix/' | grep "[A-Z]"))" "" "")
+tmpvar01+=' 2>"'"$1"'"'
+eval $tmpvar01
+if [ -f /mnt/etc/localtime ]; then rm -r /mnt/etc/localtime; fi
+ln -s /mnt/usr/share/zoneinfo/$(cat $1) /mnt/etc/localtime
+echo ''>$1
+tmpvar01='dialog --no-cancel --checklist "Select locales" "" "" "" '
+tmpvar01+='"en_US.UTF-8@UTF-8" "" "on" "uk_UA.UTF-8@UTF-8" "" "" "ru_RU.UTF-8@UTF-8" "" "" '
+tmpvar01+=$(mk_menu_list "$(echo $(cat /mnt/etc/locale.gen | grep "#[a-z,A-Z]" | sed 's/#//g' | sed 's/ /@/g' | sed 's/@@//g'))" "" "")
+tmpvar01+=' 2>"'"$1"'"'
+eval $tmpvar01
+echo 'tmpvar22=""
+for i in $(cat "'$1'"); do
+    tmpvar22=$(echo $i | sed "s/@/ /g")
+    if $(cat /etc/locale.gen | grep -q "$tmpvar22" ); then
+        '$0' f-ecf "/etc/locale.gen" "#$tmpvar22" "$tmpvar22"
+    else
+        echo $tmpvar22 >> /etc/locale.gen
+    fi
+done
+locale-gen' >/mnt/st2run
+clear
 runchr "$1"
 
 dialog  --no-cancel --inputbox "Specify a user name" '' '' "user" 2>"$1"
