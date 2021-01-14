@@ -1,13 +1,14 @@
 #!/bin/bash
+## localized version of Batch List Installation Script Tool
 
 ## checking of missing dialog
 if [ -z $1 ]; then
-    if $(dialog 2>&1 | grep -q "command not found"); then
+    if $(LANG=C dialog 2>&1 | grep -q "command not found"); then
     echo '
 It looks like the "dialog" is not available. This script will not work without it.
 Lets try to install it:
 '; sleep 2; pacman -Sy; pacman -S dialog --noconfirm --needed; fi
-    if $(dialog 2>&1 | grep -q "command not found"); then
+    if $(LANG=C dialog 2>&1 | grep -q "command not found"); then
     echo '
 Seems it did not work. Sorry.
 '; exit 0; fi
@@ -16,14 +17,29 @@ fi
 batchlist='packages.txt'
 if [ -z "$1" ]; then
     exitstatus=$(mktemp XXXXXXXX.tmp)
-    dialog --defaultno --colors --yes-label "Accept the risks" --no-label "Do NOT accept" --title "Disclaimer." --yesno '\n\Z1\ZrBy using this script you must accept potential risks of loss all your data.\n\nThe better way to save your data is to make backups to external storages.\n\nThere are no any guarantees. That means script provided As Is\Zn' '' ''
+    ## localization menu
+    dialog --colors --no-cancel --radiolist "Select installer lang" '' '' '' 'en' 'English' 'on' 'uk' 'Ukranian' '' 2>$exitstatus
+    if [ "$(cat $exitstatus)" == "uk" ]; then
+        echo 'enable (for installer) Ukranian locale and font'
+        echo 'FONT=UniCyr_8x16' >>/etc/vconsole.conf
+        echo 'uk_UA.UTF-8 UTF-8' >>/etc/locale.gen
+        locale-gen
+        systemctl restart systemd-vconsole-setup
+        lng="uk_UA.UTF-8"
+    else
+        lng="C"
+    fi
+    echo $lng >installer_lang
+    
+    dialog --defaultno --colors --yes-label "$($0 locale t050 $lng)" --no-label "$($0 locale t051 $lng)" --title "$($0 locale t052 $lng)" --yesno "$($0 locale t053 $lng)" '' ''
     if [ $? -ne 0 ]; then clear; rm -f $exitstatus ; exit 0; fi
     pacman 2&>$exitstatus
     if $(cat $exitstatus | grep -q 'command not found'); then 
-        dialog --colors --ok-label "  Got it  " --msgbox "\Z1\Zrnon official\Zn Arch Linux batch-list installation script tool. \Z3https://[github,gitlab].com/quarkscript\Zn\nCreator Andrew S.\nLicense GPL\n\nIt seems \n- this is not an Arch Linux or at least pacman did not installed.\n\nYou may try fdisk_gui, but without root privileges it will fail." '' '' #"$(($(tput lines)-10))" "$(($(tput cols)-10))"
+        dialog --colors --ok-label "$($0 locale t054 $lng)" --msgbox "$($0 locale t055 $lng)" '' '' #"$(($(tput lines)-10))" "$(($(tput cols)-10))"
         clear; $0 fdisk_gui "$exitstatus"; rm -f $exitstatus; clear; exit 0 ; fi
         #clear; rm -f $exitstatus; echo 3; exit 0 ; fi
-    dialog --colors --radiolist "\Z1\Zrnon official\Zn Arch Linux batch-list installation script tool. \Z3https://[github,gitlab].com/quarkscript\Zn\nCreator Andrew S.\nLicense GPL\n\nWhat do you want to do?   (Use space button to select item)" '' '' '' 'Make' 'packages list from runned arch linux system' '' 'Install' 'due to batch list' '' 'MakeArm' 'images (in development)' '' 2>$exitstatus
+    #dialog --colors --radiolist "$($0 locale t056 $lng)" '' '' '' 'Make' "$($0 locale t057 $lng)" '' 'Install' "$($0 locale t058 $lng)" '' 'MakeArm' "$($0 locale t059 $lng)" '' 2>$exitstatus
+    dialog --colors --ok-label "$($0 locale t187 $lng)" --cancel-label "$($0 locale t188 $lng)" --radiolist "$($0 locale t056 $lng)" '' '' '' 'Make' "$($0 locale t057 $lng)" '' 'Install' "$($0 locale t058 $lng)" 'on' 2>$exitstatus
 
     if [ -z $(cat $exitstatus) ]; then clear; rm -f $exitstatus; exit 0 ; fi # when cancel pressed
 
@@ -36,7 +52,7 @@ if [ -z "$1" ]; then
     elif [ "$(cat $exitstatus)" == "Install" ]; then
         pacstrap 2&>$exitstatus
         if $(cat $exitstatus | grep -q 'command not found'); then
-            dialog --msgbox 'It seems like you are tries to install\n a new OS from existed Arch Linux.\nTo do that you need install\n "arch-install-scripts" before.\nAnd run this again with root privileges' '' ''
+            dialog --ok-label "$($0 locale t187 $lng)" --msgbox "$($0 locale t060 $lng)" '' ''
             rm -f $exitstatus
             exit 0
         fi
@@ -48,7 +64,7 @@ if [ -z "$1" ]; then
         
         $0 disk_fnm "$exitstatus"
         
-        if ! $(mount | grep -q "/mnt"); then dialog --title 'Error' --colors --msgbox "\Z1Nothing mounted to /mnt. Installation fail.\n\n\ZnYou need to select a partition for '/' on 'Simple disk formatter and mounter' menu or mount the future root partition to /mnt manually before executing $0" '' ''; rm -f $exitstatus; exit 0; fi
+        if ! $(mount | grep -q "/mnt"); then dialog --title "$($0 locale t061 $lng)" --colors --ok-label "$($0 locale t187 $lng)" --msgbox "$($0 locale t062 $lng) $0" '' ''; rm -f $exitstatus; exit 0; fi
         
         clear
         $0 step1 "$exitstatus"
@@ -58,6 +74,8 @@ if [ -z "$1" ]; then
         else
             cp -f $(find / $tmp_mscrname | grep $tmp_mscrname -m 1) /mnt/$tmp_mscrname
         fi
+        if [ -f "installer_lang" ]; then cp -f installer_lang /mnt/installer_lang; fi
+        
         chmod +x /mnt/$tmp_mscrname
         
         echo '' > $exitstatus
@@ -68,18 +86,19 @@ if [ -z "$1" ]; then
         rm -f /mnt/st2run
         rm -f $exitstatus
         sync
-        dialog --yes-label ' Reboot ' --yesno "Now you can reboot and try the new system.\n\nWhen all is good, you will get a bootable and functional OS. Otherwise there might not be enough free space or something failed." '' ''
+        dialog --yes-label "$($0 locale t063 $lng)" --yesno "$($0 locale t064 $lng)" '' ''
         if [ $? -eq 0 ]; then reboot; fi
         
     elif [ "$(cat $exitstatus)" == "MakeArm" ]; then
         clear
-        echo 'MakeArm images possible development in future'
+        echo "$($0 locale t065 $lng)"
         #$0 step3 "$exitstatus"
         
     fi
     rm -f $exitstatus
     exit 0
 fi
+lng=$(cat installer_lang)
 
 ## ----------------- ##
 ## internal function ##
@@ -113,24 +132,24 @@ mk_batch_list(){
 if [ "$3" == "g" ]; then
     echo '0'>$1
     if [ -f "$2" ]; then
-        dialog --yesno "$2 is already existed, owerwrite it?" '' ''
+        dialog --yesno "$2 $($0 locale t066 $lng)" '' ''
         echo $? >$1
     fi
     if [ "$(cat $1)" != 1 ]; then pacman -Qqe >$2; fi
 elif [ "$3" == "t" ]; then
     echo 0 >$1
     if [ -f "$2" ]; then
-        dialog --yesno "$2 is already existed, owerwrite it?" '' ''
+        dialog --yesno "$2 $($0 locale t066 $lng)" '' ''
         echo $? >$1
     fi
     if [ "$(cat $1)" != 1 ]; then
-        dialog  --no-cancel --ok-label agree --radiolist "Warning! '$2' does not found A new '$2' will be created from template. Wich template do you want to use?" '' '' '' 'x86_64_plasma' '- plasma desktop + libreoffice + firefox...' on 'x86_64_xfce' '- xfce desktop + firefox...' '' 'x86_64_lxqt' '- lxqt desktop only' '' 'x86_64_pmlike' '- xfce + fs/disks utils' '' 'ARM_303_xfce' '- xfce desktop on ARMv7hf xe303c12 chromebook' '' 2>$1
+        dialog  --no-cancel --ok-label "$($0 locale t194 $lng)" --radiolist "$($0 locale t067 $lng) ! '$2' $($0 locale t068 $lng) '$2' $($0 locale t069 $lng)" '' '' '' 'x86_64_plasma' '- plasma desktop + libreoffice + firefox...' on 'x86_64_xfce' '- xfce desktop + firefox...' '' 'x86_64_lxqt' '- lxqt desktop only' '' 'x86_64_pmlike' '- xfce + fs/disks utils' '' 'ARM_303_xfce' '- xfce desktop on ARMv7hf xe303c12 chromebook' '' 2>$1
             if [ "$(cat $1)" == "x86_64_plasma" ]; then
                 echo "acpi acpid alsa-utils ark mkinitcpio discover audacity autoconf automake avidemux-qt bash binutils bison bluedevil bluez-cups bluez-hid2hci bluez-utils botan btrfs-progs bzip2 cdrdao cmake conky coreutils crda cryptsetup cups cups-pdf device-mapper dhcpcd dialog diffutils dolphin dosfstools dvd+rw-tools e2fsprogs ecryptfs-utils ed f2fs-tools faac fakeroot file filesystem findutils firefox firefox-i18n-ru firefox-i18n-uk flex foomatic-db-engine gawk gcc gcc-libs gettext gimp git glibc gparted grep grub gsmartcontrol gst-libav gst-plugins-good gst-plugins-ugly gstreamer-vaapi gwenview gzip hidapi imake inetutils iproute2 iputils iw k3b kate kcalc kdegraphics-mobipocket kdenetwork-filesharing kimageformats konsole krita kscreen kwalletmanager ladspa less libmirage libreoffice-fresh libreoffice-fresh-ru libreoffice-fresh-uk libtool libva-vdpau-driver libvdpau-va-gl licenses linux linux-headers logrotate lvm2 m4 make man-db man-pages mc mdadm mediainfo mkvtoolnix-gui nano netctl networkmanager networkmanager-openvpn networkmanager-qt noto-fonts-cjk noto-fonts-emoji ntfs-3g nvidia-dkms nvidia-settings ocl-icd okular opencl-headers opencl-nvidia os-prober p7zip packagekit-qt5 pacman patch pciutils perl pigz plasma-desktop plasma-nm plasma-pa powerdevil procps-ng psmisc psutils pulseaudio-alsa pulseaudio-bluetooth qt5-connectivity qt5-imageformats qt5-serialport qt5-virtualkeyboard ragel rcs samba sddm sddm-kcm sed shadow sudo sysfsutils systemd-sysvcompat tar texinfo thunderbird thunderbird-i18n-ru thunderbird-i18n-uk transcode transmission-qt ufw uget unrar unzip usbutils user-manager util-linux vcdimager vi vlc wget which wireless-regdb xf86-input-evdev xf86-input-libinput xf86-input-synaptics xf86-input-vmmouse xf86-input-void xf86-video-ati xf86-video-dummy xf86-video-fbdev xf86-video-vesa xf86-video-amdgpu xf86-video-ati xf86-video-intel xf86-video-nouveau xmlto xorg-bdftopcf xorg-docs xorg-font-util xorg-fonts-100dpi xorg-fonts-75dpi xorg-fonts-cyrillic xorg-fonts-encodings xorg-iceauth xorg-mkfontscale xorg-server xorg-server-common xorg-server-devel xorg-server-xephyr xorg-server-xnest xorg-server-xvfb xorg-server-xwayland xorg-sessreg xorg-setxkbmap xorg-smproxy xorg-x11perf xorg-xauth xorg-xbacklight xorg-xcmsdb xorg-xcursorgen xorg-xdpyinfo xorg-xdriinfo xorg-xev xorg-xgamma xorg-xhost xorg-xinput xorg-xkbcomp xorg-xkbevd xorg-xkbutils xorg-xkill xorg-xlsatoms xorg-xlsclients xorg-xmodmap xorg-xpr xorg-xprop xorg-xrandr xorg-xrdb xorg-xrefresh xorg-xset xorg-xsetroot xorg-xvinfo xorg-xwd xorg-xwininfo xorg-xwud xsane xsane-gimp yasm zip">$2
              elif [ "$(cat $1)" == "x86_64_xfce" ]; then
                 echo "base bluez btrfs-progs crda dhcpcd dialog diffutils f2fs-tools ffmpeg firefox gimp gparted grub gvfs gvfs-afc gvfs-gphoto2 gvfs-mtp gvfs-smb htop inetutils linux logrotate lvm2 lxdm man-db man-pages mc mdadm mkinitcpio mousepad mpv nano netctl network-manager-applet networkmanager nm-connection-editor os-prober p7zip pavucontrol pulseaudio-alsa samba sudo texinfo thunar thunar-archive-plugin thunar-volman unrar vi which xf86-input-evdev xf86-input-libinput xf86-input-synaptics xf86-input-void xf86-input-wacom xf86-video-amdgpu xf86-video-ati xf86-video-fbdev xf86-video-intel xf86-video-nouveau xf86-video-vesa xfce4-appfinder xfce4-artwork xfce4-battery-plugin xfce4-clipman-plugin xfce4-cpufreq-plugin xfce4-cpugraph-plugin xfce4-datetime-plugin xfce4-fsguard-plugin xfce4-genmon-plugin xfce4-mount-plugin xfce4-netload-plugin xfce4-notifyd xfce4-panel xfce4-power-manager xfce4-pulseaudio-plugin xfce4-screenshooter xfce4-sensors-plugin xfce4-session xfce4-settings xfce4-systemload-plugin xfce4-taskmanager xfce4-terminal xfce4-time-out-plugin xfce4-timer-plugin xfce4-verve-plugin xfce4-wavelan-plugin xfce4-whiskermenu-plugin xfce4-xkb-plugin xfdesktop xfwm4 xfwm4-themes xorg-fonts-100dpi xorg-fonts-75dpi xorg-iceauth xorg-server xorg-sessreg xorg-setxkbmap xorg-smproxy xorg-xauth xorg-xbacklight xorg-xcmsdb xorg-xcursorgen xorg-xdpyinfo xorg-xdriinfo xorg-xev xorg-xgamma xorg-xinput xorg-xkbevd xorg-xkbutils xorg-xkill xorg-xlsatoms xorg-xlsclients xorg-xmodmap xorg-xpr xorg-xprop xorg-xrandr xorg-xrdb xorg-xrefresh xorg-xset xorg-xsetroot xorg-xvinfo xorg-xwd xorg-xwininfo xorg-xwud zip ">$2
             elif [ "$(cat $1)" == "x86_64_lxqt" ]; then
-                echo "acpi acpid alsa-firmware alsa-utils b43-fwcutter base btrfs-progs cifs-utils crda dhclient dhcpcd dialog diffutils dmraid ecryptfs-utils f2fs-tools grub haveged inetutils liblxqt linux linux-firmware linux-headers logrotate lximage-qt lxqt-about lxqt-admin lxqt-archiver lxqt-config lxqt-globalkeys lxqt-notificationd lxqt-openssh-askpass lxqt-panel lxqt-policykit lxqt-powermanagement lxqt-qtplugin lxqt-runner lxqt-session lxqt-sudo lxqt-themes man-db man-pages mdadm mkinitcpio nano net-tools network-manager-applet networkmanager-qt nm-connection-editor ntfs-3g obconf-qt openbox openssh os-prober pcmanfm-qt powertop pulseaudio-alsa reflector rsync s-nail screengrab sddm sudo sysfsutils syslog-ng texinfo usbutils which wpa_supplicant xdg-user-dirs xdg-utils xf86-input-vmmouse xf86-video-amdgpu xf86-video-ati xf86-video-dummy xf86-video-fbdev xf86-video-intel xf86-video-nouveau xf86-video-openchrome xf86-video-sisusb xf86-video-vesa xf86-video-vmware xf86-video-voodoo xorg-iceauth xorg-server xorg-sessreg xorg-setxkbmap xorg-smproxy xorg-xauth xorg-xbacklight xorg-xcmsdb xorg-xcursorgen xorg-xdpyinfo xorg-xdriinfo xorg-xev xorg-xgamma xorg-xinit xorg-xinput xorg-xkbevd xorg-xkbutils xorg-xkill xorg-xlsatoms xorg-xlsclients xorg-xmodmap xorg-xpr xorg-xprop xorg-xrandr xorg-xrdb xorg-xrefresh xorg-xset xorg-xsetroot xorg-xvinfo xorg-xwd xorg-xwininfo xorg-xwud xterm zip ">$2
+                echo "acpi acpid alsa-firmware alsa-utils b43-fwcutter base btrfs-progs cifs-utils crda dhclient dhcpcd dialog diffutils dmraid ecryptfs-utils f2fs-tools grub haveged inetutils liblxqt linux linux-firmware linux-headers logrotate lximage-qt lxqt-about lxqt-admin lxqt-archiver lxqt-config lxqt-globalkeys lxqt-notificationd lxqt-openssh-askpass lxqt-panel lxqt-policykit lxqt-powermanagement lxqt-qtplugin lxqt-runner lxqt-session lxqt-sudo lxqt-themes man-db man-pages mdadm mkinitcpio nano net-tools network-manager-applet networkmanager-qt nm-connection-editor ntfs-3g obconf-qt openbox openssh os-prober pcmanfm-qt powertop pulseaudio-alsa reflector rsync s-nail screengrab sddm sudo sysfsutils syslog-ng texinfo usbutils which wpa_supplicant xdg-user-dirs xdg-utils xf86-input-vmmouse xf86-video-amdgpu xf86-video-ati xf86-video-dummy xf86-video-fbdev xf86-video-intel xf86-video-nouveau xf86-video-openchrome xf86-video-sisusb xf86-video-vesa xf86-video-vmware xf86-video-voodoo xorg-iceauth xorg-server xorg-sessreg xorg-setxkbmap xorg-smproxy xorg-xauth xorg-xbacklight xorg-xcmsdb xorg-xcursorgen xorg-xdpyinfo xorg-xdriinfo xorg-xev xorg-xgamma xorg-xinit xorg-xinput xorg-xkbevd xorg-xkbutils xorg-xkill xorg-xlsatoms xorg-xlsclients xorg-xmodmap xorg-xpr xorg-xprop xorg-xrandr xorg-xrdb xorg-xrefresh xorg-xset xorg-xsetroot xorg-xvinfo xorg-xwd xorg-xwininfo xorg-xwud qterminal xterm zip ">$2
             elif [ "$(cat $1)" == "x86_64_pmlike" ]; then
                 echo "afpfs-ng avfs base bleachbit bluez bonnie++ btfs btrfs-progs cabextract cdrtools cgmanager chntpw cifs-utils clonezilla compsize crda cryfs curlftpfs cyrus-sasl dash davfs2 ddrescue dhcpcd dialog diffutils dmapi dmg2img dracut dstat duperemove ecryptfs-utils efibootmgr elfutils emelfm2 encfs ethtool evince exfat-utils expect extundelete f2fs-tools fatresize ffmpeg file-roller firefox foremost freerdp fsarchiver fscrypt fuse-overlayfs galculator gcr gd glusterfs gnome-disk-utility gocryptfs gpart gparted gphoto2 grsync grub grub-customizer guvcview hardinfo hddtemp hexchat hexedit htop idle3-tools inetutils iperf iperf3 jfsutils kbfs lastpass-cli leafpad lftp libbsd libcaca libewf libgtop libieee1284 libisoburn libisofs libldm libmbim libmng libndp libplist libqmi libusbmuxd linux logrotate lshw lsscsi lvm2 lxcfs lxdm man-db man-pages mate-utils mbedtls mc mdadm memtester mhash minicom mkinitcpio mousepad mpv mtools mtpfs multipath-tools nano nbd ncdu ncftp ncompress net-tools netctl netpbm network-manager-applet networkmanager networkmanager-pptp nfs-utils nm-connection-editor nmap notification-daemon ntp nvme-cli openvpn os-prober p7zip parallel pavucontrol pcmanfm-gtk3 poppler-data powertop psensor pth pulseaudio-alsa putty pv rdesktop rdiff-backup read-edid remmina reptyr rp-pppoe s3fs-fuse samba sane sbc scite shake sleuthkit smartmontools smbnetfs snapper squashfs-tools squashfuse stress sudo syslinux taglib tcplay testdisk texinfo thunar thunar-archive-plugin thunar-volman tigervnc tk tmux tree truecrypt udevil unrar veracrypt vi which wimlib wipe x11vnc xdialog xf86-input-evdev xf86-input-libinput xf86-input-synaptics xf86-input-void xf86-input-wacom xf86-video-amdgpu xf86-video-ati xf86-video-fbdev xf86-video-intel xf86-video-nouveau xf86-video-vesa xfburn xfce4-appfinder xfce4-artwork xfce4-battery-plugin xfce4-clipman-plugin xfce4-cpufreq-plugin xfce4-cpugraph-plugin xfce4-datetime-plugin xfce4-fsguard-plugin xfce4-genmon-plugin xfce4-mount-plugin xfce4-netload-plugin xfce4-notifyd xfce4-panel xfce4-power-manager xfce4-pulseaudio-plugin xfce4-screenshooter xfce4-sensors-plugin xfce4-session xfce4-settings xfce4-systemload-plugin xfce4-taskmanager xfce4-terminal xfce4-time-out-plugin xfce4-timer-plugin xfce4-verve-plugin xfce4-wavelan-plugin xfce4-whiskermenu-plugin xfce4-xkb-plugin xfdesktop xfsdump xfwm4 xfwm4-themes xorg-fonts-100dpi xorg-fonts-75dpi xorg-iceauth xorg-server xorg-sessreg xorg-setxkbmap xorg-smproxy xorg-xauth xorg-xbacklight xorg-xcmsdb xorg-xcursorgen xorg-xdpyinfo xorg-xdriinfo xorg-xev xorg-xgamma xorg-xinput xorg-xkbevd xorg-xkbutils xorg-xkill xorg-xlsatoms xorg-xlsclients xorg-xmodmap xorg-xpr xorg-xprop xorg-xrandr xorg-xrdb xorg-xrefresh xorg-xset xorg-xsetroot xorg-xvinfo xorg-xwd xorg-xwininfo xorg-xwud yad zip zsync">$2
             elif [ "$(cat $1)" == "ARM_303_xfce" ]; then
@@ -139,7 +158,7 @@ elif [ "$3" == "t" ]; then
     fi
 elif [ "$3" == "e" ]; then
     
-    dlg='dialog --no-cancel --ok-label agree --checklist "The packagelist. Do you wish to exclude something from here? just deselect it." "" "" "" '
+    dlg='dialog --no-cancel --ok-label "'"$($0 locale t194 $lng)"'" --checklist "'"$($0 locale t070 $lng)"'" "" "" "" '
     for jj in $(echo $(cat $2)); do
         dlg+='"'"$jj"'" "" on '
     done
@@ -360,7 +379,7 @@ fdisk_gui(){
 ## $1 - exitstatus
 ## 
 
-tmpvar01='dialog --title 'Warning' --colors --yesno "\nSimple fdisk gui. \Z1Use it with cautions.\Zn \n\nIf you are do not understand what is this for then press No. \nOtherwise you may \Z1\Zrdestroy all data\Zn from all your hard drives.\Zn \nYou have been warned.\n\nThis script provide a few basic functions. \nIf you need more than that run fdisk directly. \n\nDo you wish to continue?" "" "" ' #2>"'"$1"'"'
+tmpvar01='dialog --title "'"$($0 locale t067 $lng)"'" --colors --yes-label "'"$($0 locale t192 $lng)"'" --no-label "'"$($0 locale t193 $lng)"'" --yesno "'"$($0 locale t071 $lng)"'" "" "" ' #2>"'"$1"'"'
 eval $tmpvar01
 echo $?>"$1"
 if [ "$(cat $1)" -ne 0 ]; then return 0; fi
@@ -372,7 +391,7 @@ while [ ! -z "$tmp_menu_cycle00" ]; do
     #tmpvar02=testdik.img
     #tmpvar02=$(echo $(ls /dev/disk/by-id | grep -v part | grep -v wwn))
     tmpvar02=$(echo $(ls /dev | grep -e 'sd' -e 'mmc' | grep -v "[1-9]"))
-    tmpvar01='dialog --no-cancel --radiolist "Select disk to process" "" "" "" '
+    tmpvar01='dialog --no-cancel --ok-label "'$($0 locale t187 $lng)'" --cancel-label "'$($0 locale t188 $lng)'" --radiolist "'"$($0 locale t072 $lng)"'" "" "" "" '
     tmpvar01+=$(mk_menu_list "$tmpvar02" "on" "1")
     tmpvar01+=' 2>"'"$1"'"'
     eval $tmpvar01
@@ -381,12 +400,12 @@ while [ ! -z "$tmp_menu_cycle00" ]; do
     sector_size=$(echo -e "p\nq" | fdisk $diskpath | grep "Units: sectors" | sed 's/ bytes.*//g' | sed 's/.*= //g')
 
     if $(echo -e "i\nq" | fdisk $diskpath | grep -q "Device does not contain a recognized partition table."); then
-        dialog --msgbox "Looks like disk is empty" "5" "30"
-        dialog --no-cancel --radiolist "Select partition table type" "" "" "" "dos" " - create a new empty DOS partition table (boot from BIOS)" "on" "gpt" " - create a new empty GPT partition table (boot from UEFI)" "" 2>"$1"
+        dialog --ok-label "$($0 locale t187 $lng)" --msgbox "$($0 locale t073 $lng)" '5' '30'
+        dialog --no-cancel --ok-label "$($0 locale t187 $lng)" --radiolist "$($0 locale t074 $lng)" "" "" "" "dos" "$($0 locale t075 $lng)" "on" "gpt" "$($0 locale t076 $lng)" "" 2>"$1"
     else
-        dialog --colors --defaultno --yesno "Do you want to re-create \na partitions table?\n\n\Z1All existed data will be lost\Zn." "" ""
+        dialog --colors --defaultno --yes-label "$($0 locale t192 $lng)" --no-label "$($0 locale t193 $lng)" --yesno "$($0 locale t077 $lng)" "" ""
         if [ $? -eq 0 ];then
-            dialog --no-cancel --radiolist "Select partition table type" "" "" "" "dos" " - boot from BIOS" "on" "gpt" " - boot from UEFI" "" 2>"$1"
+            dialog --no-cancel --ok-label "$($0 locale t187 $lng)" --radiolist "$($0 locale t078 $lng)" "" "" "" "dos" "$($0 locale t079 $lng)" "on" "gpt" "$($0 locale t080 $lng)" "" 2>"$1"
             #diskpath="--wipe always $diskpath"
         fi
     fi
@@ -409,8 +428,8 @@ while [ ! -z "$tmp_menu_cycle00" ]; do
         tmpvar10=$(mk_menu_list "$(echo $(cat $1 | sed 's/.*part/part/g' | sed 's/ /_/g'))" "" "")
         #tmpvar10=$(mk_menu_list "$(echo $(cat $1 | sed 's/ /_/g'))" "" "")
         tmpvar10=$(echo $tmpvar10 | sed 's/_/ /g')
-        tmpvar10+=" ' Write ALL changes and exit' '' '' ' Discard ANY changes and exit' '' 'on' "
-        tmpvar10="dialog --no-cancel --radiolist 'Select partition or free space \n\nUse arrow keys, space-key and enter.' '' '' '' $tmpvar10 " 
+        tmpvar10+=" '$($0 locale t081 $lng)' '' '' '$($0 locale t082 $lng)' '' 'on' "
+        tmpvar10="dialog --no-cancel --ok-label ""$($0 locale t187 $lng)"" --radiolist '$($0 locale t083 $lng)' '' '' '' $tmpvar10 " 
         tmpvar10+=' 2>"'"$1"'"'
         #echo $fdisk_script
         #sleep 7
@@ -422,9 +441,9 @@ while [ ! -z "$tmp_menu_cycle00" ]; do
                 part_sz=$(cat $1 | sed 's/ free.*//g' | sed 's/.* //g')
                 if $(cat "$1" | grep -q "Logical"); then
                     if [ "$log_parts_num" -eq 0 ]; then
-                        dialog --no-cancel --title "Start Sector of new DOS logical partition" --inputbox "\nChoose a start sector ($(($part_of+0)) - $(($part_of+$part_sz)))" '' '' "$(almb "$part_of" "$sector_size")" 2>"$1"
+                        dialog --no-cancel --title "$($0 locale t084 $lng)" --ok-label "$($0 locale t187 $lng)" --inputbox "$($0 locale t085 $lng) ($(($part_of+0)) - $(($part_of+$part_sz)))" '' '' "$(almb "$part_of" "$sector_size")" 2>"$1"
                     else
-                        dialog --no-cancel --title "Start Sector of new DOS logical partition" --inputbox "\nChoose a start sector ($(($part_of+1)) - $(($part_of+$part_sz)))" '' '' "$(almb "$(($part_of+1))" "$sector_size")" 2>"$1"
+                        dialog --no-cancel --title "$($0 locale t084 $lng)" --ok-label "$($0 locale t187 $lng)" --inputbox "$($0 locale t085 $lng) ($(($part_of+1)) - $(($part_of+$part_sz)))" '' '' "$(almb "$(($part_of+1))" "$sector_size")" 2>"$1"
                     fi
                     ## if no free primary space left
                     if [ "$free_pri_space" -eq 0 ]; then
@@ -432,24 +451,24 @@ while [ ! -z "$tmp_menu_cycle00" ]; do
                     else
                         fdisk_script_tmp="$fdisk_script""n\nl\n$(cat $1)\n"
                     fi
-                    dialog --no-cancel --title "End sector of new DOS partition" --inputbox "\n($(($part_of+1)) - $(($part_of+$part_sz)))\nor +/-sectors or +/-size{K,M,G,T,P}\n(current hard drive sector size is $sector_size bytes)" '' '' "$(($part_of+$part_sz))" 2>"$1"
+                    dialog --no-cancel --title "$($0 locale t086 $lng)" --ok-label "$($0 locale t187 $lng)" --inputbox "\n($(($part_of+1)) - $(($part_of+$part_sz)))\n$($0 locale t183 $lng) $sector_size $($0 locale t184 $lng))" '' '' "$(($part_of+$part_sz))" 2>"$1"
                     fdisk_script_tmp="$fdisk_script_tmp""$(cat $1)\n"
                     if $(echo -e "$fdisk_script_tmp""\n\n\n\n\nq" | fdisk $diskpath 2>&1 | grep -q "Value out of range")||$(echo -e "$fdisk_script_tmp""\n\n\n\n\nq" | fdisk $diskpath 2>&1 | grep -q "unknown command"); then
-                        dialog --msgbox 'Something wrong with entered values.' '6' '30'
+                        dialog --ok-label "$($0 locale t187 $lng)" --msgbox "$($0 locale t087 $lng)" '6' '30'
                     else
                         fdisk_script="$fdisk_script_tmp"
                     fi
                 elif [ "$pri_parts_num" -lt 4 ]; then
                     if [ "$is_there_exte" == "0" ]; then
-                        dialog --no-cancel --radiolist "select type of new partition" '' '' '' 'p' 'Primary' 'on' 'e' 'Extended' '' 2>"$1"
+                        dialog --no-cancel --ok-label "$($0 locale t187 $lng)" --radiolist "$($0 locale t088 $lng)" '' '' '' 'p' "$($0 locale t089 $lng)" 'on' 'e' "$($0 locale t090 $lng)" '' 2>"$1"
                     else
                         echo p>"$1"
                     fi
                     tmpvar17=$(echo $(cat "$1"))
                     if [ "$pri_parts_num" -eq 0 ]; then
-                        dialog --no-cancel --title "Start sector of new DOS partition" --inputbox "\nChoose a start sector ($(($part_of)) - $(($part_of+$part_sz)))" '' '' "$(($part_of))" 2>"$1"
+                        dialog --no-cancel --title "$($0 locale t091 $lng)" --ok-label "$($0 locale t187 $lng)" --inputbox "$($0 locale t092 $lng) ($(($part_of)) - $(($part_of+$part_sz)))" '' '' "$(($part_of))" 2>"$1"
                     else
-                        dialog --no-cancel --title "Start sector of new DOS partition" --inputbox "\nChoose a start sector ($(($part_of+1)) - $(($part_of+$part_sz)))" '' '' "$(almb "$(($part_of+1))" "$sector_size")" 2>"$1"
+                        dialog --no-cancel --title "$($0 locale t091 $lng)" --ok-label "$($0 locale t187 $lng)" --inputbox "$($0 locale t092 $lng) ($(($part_of+1)) - $(($part_of+$part_sz)))" '' '' "$(almb "$(($part_of+1))" "$sector_size")" 2>"$1"
                     fi
                     if [ "$(($pri_parts_num+0))" -eq 3 ]; then
                         fdisk_script_tmp="$fdisk_script""n\n$tmpvar17\n$(cat $1)\n"
@@ -457,10 +476,10 @@ while [ ! -z "$tmp_menu_cycle00" ]; do
                         fdisk_script_tmp="$fdisk_script""n\n$tmpvar17\n\n$(cat $1)\n"
                     fi
                     
-                    dialog --no-cancel --title "End sector of new DOS partition" --inputbox "\n($part_of - $(($part_of+$part_sz-0)))\nor +/-sectors or +/-size{K,M,G,T,P}\n(current hard drive sector size is $sector_size bytes)" '' '' "$(($part_of+$part_sz-0))" 2>"$1"
+                    dialog --no-cancel --title "$($0 locale t093 $lng)" --ok-label "$($0 locale t187 $lng)" --inputbox "\n($part_of - $(($part_of+$part_sz-0)))\n$($0 locale t183 $lng) $sector_size $($0 locale t184 $lng)" '' '' "$(($part_of+$part_sz-0))" 2>"$1"
                     fdisk_script_tmp="$fdisk_script_tmp""$(cat $1)\n"
                     if $(echo -e "$fdisk_script_tmp""\n\n\n\n\nq" | fdisk $diskpath 2>&1 | grep -q "Value out of range")||$(echo -e "$fdisk_script_tmp""\n\n\n\n\nq" | fdisk $diskpath 2>&1 | grep -q "unknown command"); then
-                        dialog --msgbox 'Something wrong with entered values.' '6' '30'
+                        dialog --ok-label "$($0 locale t187 $lng)" --msgbox "$($0 locale t087 $lng)" '6' '30'
                     else
                         fdisk_script="$fdisk_script_tmp"
                     fi
@@ -469,18 +488,18 @@ while [ ! -z "$tmp_menu_cycle00" ]; do
                 part_of=$(cat $1 | sed 's/ .*//g')
                 part_sz=$(cat $1 | sed 's/ free//g' | sed 's/.* //g')
                 if [ "$curr_parts" == "0" ]; then
-                    dialog --no-cancel --title "New GPT partition start sector" --inputbox "\nChoose a start sector ($part_of - $(($part_of+$part_sz)))" '' '' $part_of"" 2>"$1"
+                    dialog --no-cancel --title "$($0 locale t094 $lng)" --ok-label "$($0 locale t187 $lng)" --inputbox "$($0 locale t095 $lng) ($part_of - $(($part_of+$part_sz)))" '' '' $part_of"" 2>"$1"
                 else
-                    dialog --no-cancel --title "New GPT partition start sector" --inputbox "\nChoose a start sector ($part_of - $(($part_of+$part_sz)))" '' '' ""$(almb "$(($part_of+1))" "$sector_size")"" 2>"$1"
+                    dialog --no-cancel --title "$($0 locale t094 $lng)" --ok-label "$($0 locale t187 $lng)" --inputbox "$($0 locale t095 $lng) ($part_of - $(($part_of+$part_sz)))" '' '' ""$(almb "$(($part_of+1))" "$sector_size")"" 2>"$1"
                 fi
                 fdisk_script_tmp="$fdisk_script""n\n\n$(cat $1)\n"
                 
-                dialog --no-cancel --title "New GPT partition end sector" --inputbox "\n($(($part_of+1)) - $(($part_of+$part_sz)))\nor +/-sectors or +/-size{K,M,G,T,P}\n(current hard drive sector size is $sector_size bytes)" '' '' "$(($part_of+$part_sz))" 2>"$1"
+                dialog --no-cancel --title "$($0 locale t096 $lng)" --ok-label "$($0 locale t187 $lng)" --inputbox "\n($(($part_of+1)) - $(($part_of+$part_sz)))\n$($0 locale t183 $lng) $sector_size $($0 locale t184 $lng)" '' '' "$(($part_of+$part_sz))" 2>"$1"
                 
                 fdisk_script_tmp="$fdisk_script_tmp""$(cat $1)\n"
                 
                 if $(echo -e "$fdisk_script_tmp""\n\n\n\n\nq" | fdisk $diskpath 2>&1 | grep -q "Value out of range")||$(echo -e "$fdisk_script_tmp""\n\n\n\n\nq" | fdisk $diskpath 2>&1 | grep -q "unknown command"); then
-                    dialog --msgbox 'Something wrong with entered values.' '6' '30'
+                    dialog --ok-label "$($0 locale t187 $lng)" --msgbox "$($0 locale t087 $lng)" '6' '30'
                 else
                     fdisk_script="$fdisk_script_tmp"
                 fi
@@ -490,13 +509,13 @@ while [ ! -z "$tmp_menu_cycle00" ]; do
                 tmpvar13=$(cat "$1" | grep part | sed 's/.*part//g')
                 tmpvar11=$(cat "$1" | grep part | sed 's/.*part//g' | sed 's/ .*//g')
                 if $(cat "$1" | grep "part$tmpvar11" | grep -q Extended); then
-                    dialog --radiolist 'Edit partition menu' '' '' '' 'delete partition' '' '' 2> "$1"
+                    dialog --ok-label "$($0 locale t187 $lng)" --cancel-label "$($0 locale t188 $lng)" --radiolist "$($0 locale t097 $lng)" '' '' '' "$($0 locale t098 $lng)" '' '' 2> "$1"
                 else
-                    dialog --radiolist 'Edit partition menu' '' '' '' 'delete partition' '' '' 'change partition type' '' '' 'switch boot flag' '' ''  2> "$1"
+                    dialog --ok-label "$($0 locale t187 $lng)" --cancel-label "$($0 locale t188 $lng)" --radiolist "$($0 locale t097 $lng)" '' '' '' "$($0 locale t098 $lng)" '' '' "$($0 locale t099 $lng)" '' '' "$($0 locale t100 $lng)" '' ''  2> "$1"
                 fi
-                if $(cat "$1" | grep -q delete); then
+                if $(cat "$1" | grep -q "$($0 locale t098 $lng)"); then
                     if $(echo $tmpvar13 | grep -q "Extended"); then
-                        dialog --colors --yesno '\Z1Warning! Removing Extended partition leads to remove all logical partitions!\Zn\n\nDo you wish to proceed?' '' ''
+                        dialog --colors --yes-label "$($0 locale t192 $lng)" --no-label "$($0 locale t193 $lng)" --yesno "$($0 locale t101 $lng)" '' ''
                         if [ $? -eq 0 ]; then
                             if [ "$curr_parts" -eq 1 ]; then
                                 fdisk_script="$fdisk_script""d\n"
@@ -511,7 +530,7 @@ while [ ! -z "$tmp_menu_cycle00" ]; do
                             fdisk_script="$fdisk_script""d\n$tmpvar11\n"
                         fi
                     fi
-                elif $(cat "$1" | grep -q change); then
+                elif $(cat "$1" | grep -q "$($0 locale t099 $lng)"); then
                     ## detect current type
                     if [ "$curr_parts" -eq 1 ]; then
                         tmpvar12=$(echo -e "$fdisk_script""\ni\nq" | fdisk $diskpath | grep "Id:" | sed 's/.*Id: //g' | sed 's/ .*//g')
@@ -529,7 +548,7 @@ while [ ! -z "$tmp_menu_cycle00" ]; do
                             tmpvar10+="'' "
                         fi
                     done
-                    tmpvar10="dialog --no-cancel --radiolist 'Change DOS partition TYPE menu\nsome partition types may fail this script' '' '' '' $tmpvar10"
+                    tmpvar10="dialog --no-cancel --ok-label ""$($0 locale t187 $lng)"" --radiolist '""$($0 locale t102 $lng)""' '' '' '' $tmpvar10"
                     tmpvar10=$(echo $tmpvar10 | sed 's/@/ /g' | sed 's/(//g' | sed 's/)//g')
                     tmpvar10+=' 2>"'"$1"'"'
                      
@@ -544,7 +563,7 @@ while [ ! -z "$tmp_menu_cycle00" ]; do
                             fi
                         fi
                     fi
-                elif $(cat "$1" | grep -q boot); then
+                elif $(cat "$1" | grep -q "$($0 locale t100 $lng)"); then
                     if [ "$curr_parts" -eq 1 ]; then
                         fdisk_script="$fdisk_script""\na\n"
                     else
@@ -553,14 +572,14 @@ while [ ! -z "$tmp_menu_cycle00" ]; do
                 fi
             elif [ "$part_table_type" == "gpt" ]; then
                 tmpvar11=$(cat $1 | grep part | sed 's/.*part//g' | sed 's/ .*//g')
-                dialog --radiolist 'Edit partition menu' '' '' '' 'delete partition' '' '' 'change partition type' '' '' 2> "$1"
-                if $(cat "$1" | grep -q delete); then
+                dialog --ok-label "$($0 locale t187 $lng)" --cancel-label "$($0 locale t188 $lng)" --radiolist "$($0 locale t097 $lng)" '' '' '' "$($0 locale t098 $lng)" '' '' "$($0 locale t099 $lng)" '' '' 2> "$1"
+                if $(cat "$1" | grep -q "$($0 locale t098 $lng)"); then
                     if [ "$curr_parts" -eq 1 ]; then
                         fdisk_script="$fdisk_script""d\n"
                     else
                         fdisk_script="$fdisk_script""d\n$tmpvar11\n"
                     fi
-                elif $(cat "$1" | grep -q change); then
+                elif $(cat "$1" | grep -q "$($0 locale t099 $lng)"); then
                     ## detect current type
                     if [ "$curr_parts" -eq 1 ]; then
                         tmpvar12=$(echo $(echo -e "g\n\nl\nq" | fdisk $diskpath | sed "s/Command (m for help): //g" | grep -e "$(echo $(echo -e "$fdisk_script""\ni\nq" | fdisk $diskpath | grep "Type-UUID:") | sed 's/.*Type-UUID: //g' | sed 's/ .*//g')") | sed 's/ .*//g')
@@ -569,7 +588,7 @@ while [ ! -z "$tmp_menu_cycle00" ]; do
                     fi
                     ## make menulist
                     echo -e "$(echo -e "g\n\nl\nq" | fdisk $diskpath)" | sed "s/Command (m for help): //g" | grep -e "[ ][ ,1-9][0-9][ ][A-Z]" | sed 's/[0-9,A-Z][0-9,A-Z][0-9,A-Z][0-9,A-Z][0-9,A-Z][0-9,A-Z][0-9,A-Z][0-9,A-Z]-.*//g' > "$1"
-                    tmpvar10="dialog --no-cancel --radiolist 'Change GPT partition TYPE menu' '' '' '' "
+                    tmpvar10="dialog --no-cancel --ok-label ""$($0 locale t187 $lng)"" --radiolist '$($0 locale t103 $lng)' '' '' '' "
                     for ((tmp_cycle4=1;tmp_cycle4<=$(echo $(wc -l "$1") | sed 's/ .*//g');tmp_cycle4++)); do
                         if [ "$tmp_cycle4" == "$tmpvar12" ]; then
                             tmpvar10+="'$(echo $(cat $1 | head -n $tmp_cycle4 | tail -n 1 | sed "s/'/~/g"))' '' 'on' "
@@ -577,8 +596,7 @@ while [ ! -z "$tmp_menu_cycle00" ]; do
                             tmpvar10+="'$(echo $(cat $1 | head -n $tmp_cycle4 | tail -n 1 | sed "s/'/~/g"))' '' '' "
                         fi
                     done
-                    tmpvar10+=' 2>"'"$1"'"'
-                     
+                    tmpvar10+=' 2>"'"$1"'"' 
                     eval $tmpvar10
                     tmpvar10=$(cat $1 | sed 's/ .*//g')
                     if [ "$tmpvar12" -ne "$tmpvar10" ]; then
@@ -593,11 +611,11 @@ while [ ! -z "$tmp_menu_cycle00" ]; do
                 
             fi
         fi
-        if $(cat $1 | grep -q exit); then tmp_menu_cycle01=""; fi
-        if $(cat $1 | grep -q "Write ALL"); then 
-            dialog --defaultno --colors --yesno '\Z1.... Are you sure? ....\n\nChanges will be writed.\n\nAll data from modified\npartitions will be \Zrlost\Zn' '' ''
+        if $(cat $1 | grep -q "$(echo $($0 locale t082 $lng))"); then tmp_menu_cycle01=""; fi
+        if $(cat $1 | grep -q "$(echo $($0 locale t081 $lng))"); then 
+            dialog --defaultno --colors --yes-label "$($0 locale t192 $lng)" --no-label "$($0 locale t193 $lng)" --yesno "$($0 locale t104 $lng)" '10' '30'
             if [ $? -eq 0 ]; then
-                echo -e "$fdisk_script""\nw" | fdisk $diskpath
+                echo -e "$fdisk_script""\nw" | fdisk $diskpath 
                 sleep 10
                 partprobe
                 tmp_menu_cycle01=""
@@ -605,8 +623,8 @@ while [ ! -z "$tmp_menu_cycle00" ]; do
         fi
     done
     fdisk_script=''
-    dialog --no-cancel --radiolist ' What is your next step?' '' '' '' 'select another disk to edit' '' '' 'exit from fdisk simple gui' '' 'on' 2>"$1"
-    if $(cat $1 | grep -q exit); then tmp_menu_cycle00=""; fi
+    dialog --no-cancel --ok-label "$($0 locale t187 $lng)" --radiolist "$($0 locale t105 $lng)" '' '' '' "$($0 locale t106 $lng)" '' '' "$($0 locale t107 $lng)" '' 'on' 2>"$1"
+    if $(cat $1 | grep -q "$($0 locale t107 $lng)"); then tmp_menu_cycle00=""; fi
 done 
 }
 
@@ -721,7 +739,7 @@ disk_fnm(){
 ## $1 - exitstatus
 ## $2 - disk image path
 if [ -z $2 ]; then
-    tmpvar01='dialog --title 'Warning' --colors --yesno "\nSimple disk formatter and mounter. \Z1Use it with cautions.\Zn \n\nYou still can \Z1\Zrdestroy all data\Zn from all your hard drives.\Zn \nYou have been warned.\n\nThis script provide a few basic functions. \nIf you need more than that use command promt directly. \n\nDo you wish to continue?" "" "" ' #2>"'"$1"'"'
+    tmpvar01='dialog --title '"$($0 locale t067 $lng)"' --colors '"--yes-label '"$($0 locale t192 $lng)"' --no-label '"$($0 locale t193 $lng)"'"' --yesno "'"$($0 locale t108 $lng)"'" "" "" ' #2>"'"$1"'"'
     eval $tmpvar01
     echo $?>"$1"
     if [ "$(cat $1)" -ne 0 ]; then return 0; fi
@@ -739,7 +757,7 @@ while [ ! -z "$tmp_menu_cycle00" ]; do
         #tmpvar02=$(echo $(ls /dev/disk/by-id | grep -v part | grep -v wwn))
         tmpvar02=$(echo $(ls /dev | grep -e 'sd' -e 'mmc' | grep -v "[1-9]"))
     fi
-    tmpvar01='dialog --no-cancel --radiolist "Select disk to process" "" "" "" '
+    tmpvar01='dialog --no-cancel --ok-label "'"$($0 locale t187 $lng)"'" --radiolist "'"$($0 locale t109 $lng)"'" "" "" "" '
     tmpvar01+=$(mk_menu_list "$tmpvar02" "on" "1")
     tmpvar01+=' 2>"'"$1"'"'
     eval $tmpvar01
@@ -748,7 +766,7 @@ while [ ! -z "$tmp_menu_cycle00" ]; do
     sector_size=$(echo -e "p\nq" | fdisk $diskpath | grep "Units: sectors" | sed 's/ bytes.*//g' | sed 's/.*= //g')
 
     if $(echo -e "i\n\nq" | fdisk $diskpath | grep -q "Device does not contain a recognized partition table."); then
-        dialog --ok-label ' Exit ' --msgbox "Looks like disk is empty.\nFormat and mount disk without\npartitions unsupported now." "7" "35"
+        dialog --ok-label "$($0 locale t110 $lng)" --msgbox "$($0 locale t111 $lng)" "7" "35"
         return 1
     fi
     if $(echo -e "p\n\nq" | fdisk $diskpath | grep 'Disklabel type:' | grep -q gpt)&&$(echo $mount_ponts | grep -vq bootefi); then
@@ -767,24 +785,24 @@ while [ ! -z "$tmp_menu_cycle00" ]; do
     while [ ! -z "$tmp_menu_cycle01" ]; do
         tmpvar10=$(mk_menu_list "$parts_lst" "" "")
         tmpvar10=$(echo $tmpvar10 | sed 's/@/ /g')
-        tmpvar10+=" ' Select another disk (discard current)' '' '' ' Discard All changes and exit' '' 'on' ' Write All changes and exit' '' '' "
-        tmpvar10="dialog --no-cancel --radiolist 'Select partition' '' '' '' $tmpvar10 " 
+        tmpvar10+=" '$($0 locale t190 $lng)' '' '' '$($0 locale t082 $lng)' '' 'on' '$($0 locale t081 $lng)' '' '' "
+        tmpvar10="dialog --no-cancel --ok-label '""$($0 locale t187 $lng)""' --radiolist '$($0 locale t189 $lng)' '' '' '' $tmpvar10 " 
         tmpvar10+=' 2>"'"$1"'"'
         eval $tmpvar10
         if $(cat "$1" | grep -q "/")||$(cat "$1" | grep -q " luks")||$(cat "$1" | grep -q "swap"); then
-            dialog --msgbox "This partition is already in use.\n\nSelect another or discard changes and run script again." '8' '40'
-        elif $(cat "$1" | grep -q "Discard"); then
+            dialog --ok-label "$($0 locale t187 $lng)" --msgbox "$($0 locale t112 $lng)" '8' '40'
+        elif $(cat "$1" | grep -q "$($0 locale t082 $lng)"); then
             tmp_menu_cycle01=''
             tmp_menu_cycle00=''
             parts_lst=''
             return 0
-        elif $(cat "$1" | grep -q "Write All"); then
+        elif $(cat "$1" | grep -q "$($0 locale t081 $lng)"); then
             if ! $(echo $parts_lst | grep -q "@/@"); then
-                dialog --colors --msgbox "\Z1WARNING! No root partition '/' is specified\Zn\n\nWithout rootfs installation by this script will fail on next steps" '' ''
+                dialog --colors --ok-label "$($0 locale t187 $lng)" --msgbox "$($0 locale t113 $lng)" '' ''
             fi
             tmp_menu_cycle01=''
             tmp_menu_cycle00=''
-        elif $(cat "$1" | grep -q "Select another disk"); then
+        elif $(cat "$1" | grep -q "$($0 locale t190 $lng)"); then
             tmp_menu_cycle01=''
             parts_lst=''
 #             dialog --defaultno --yesno 'Do you want to use partitions from other disk(s)?' '6' '35'
@@ -796,11 +814,11 @@ while [ ! -z "$tmp_menu_cycle00" ]; do
                     tmpvar10=$(mk_menu_list "$mount_ponts" "" "")
                     #tmpvar10+=" 'swap' '' '' 'luks' '' '' 'custom' '' '' 'do not use' '' 'on' "
                     tmpvar10+=" 'swap' '' '' 'custom' '' '' 'do not use' '' 'on' "
-                    tmpvar10=" dialog --no-cancel --radiolist 'How to use a partition?' '' '' '' $tmpvar10 "
+                    tmpvar10=" dialog --no-cancel --ok-label '""$($0 locale t187 $lng)""' --radiolist '$($0 locale t191 $lng)' '' '' '' $tmpvar10 "
                 else
                     tmpvar10=$(mk_menu_list "$(echo $mount_ponts | sed 's|\/ | |g' | sed 's| \/boot | |g')" "" "")
                     tmpvar10+=" 'custom' '' '' 'do not use' '' 'on' "
-                    tmpvar10=" dialog --no-cancel --radiolist 'How to use a partition?\n/ and /boot mount points encryption\nis not supported by this script' '' '' '' $tmpvar10 "
+                    tmpvar10=" dialog --no-cancel --ok-label '""$($0 locale t187 $lng)""' --radiolist '$($0 locale t114 $lng)' '' '' '' $tmpvar10 "
                 fi
                 tmpvar10+=' 2>"'"$1"'"'
                 eval $tmpvar10
@@ -808,25 +826,25 @@ while [ ! -z "$tmp_menu_cycle00" ]; do
                     parts_lst=$(echo $parts_lst | sed "s|$tune_part|$tune_part@/bootefi|g")
                     mount_ponts=$(echo $mount_ponts | sed "s|\/bootefi ||g")
                     echo ''>$1
-                    dialog  --no-cancel --radiolist 'Format to filesystem' '' '' '' 'fat' 'use when no other OS is installed' '' 'do_not_format' 'use when other OS is already installed' 'on' 2>"$1"
+                    dialog  --no-cancel --ok-label "$($0 locale t187 $lng)" --radiolist "$($0 locale t115 $lng)" '' '' '' 'fat' "$($0 locale t116 $lng)" '' 'do_not_format' "$($0 locale t117 $lng)" 'on' 2>"$1"
                     parts_lst=$(echo $parts_lst | sed "s|$tune_part|$tune_part@$(echo $(cat $1))|g")
 #                 if $(cat "$1" | grep -q "do not use"); then
 #                     echo '' >/dev/null
                 elif $(cat "$1" | grep -q custom); then
-                    dialog  --no-cancel --title "Specify a custom mount point" --inputbox "\nDo not use special symbols space and @, otherwise result will be unpredicted.\n And do not use it like /dir1/dir2... currently it is unsupported and could lead to fail. " '12' '44' "/my_dir" 2>"$1"
+                    dialog  --no-cancel --title "$($0 locale t118 $lng)" --ok-label "$($0 locale t187 $lng)" --inputbox "$($0 locale t119 $lng)" '12' '44' "/my_dir" 2>"$1"
                     if $(cat "$1" | grep -vxq "/")&&$(cat "$1" | grep -vxq "/boot"); then
                         parts_lst=$(echo $parts_lst | sed "s|$tune_part|$tune_part@$(echo $(cat $1))|g")
                         mount_ponts=$(echo $mount_ponts | sed "s|$(cat $1) ||g")
-                        dialog  --no-cancel --radiolist 'Format to filesystem' '' '' '' 'ext4' '' '' 'btrfs' '' '' 'f2fs' '' '' 'fat' '' '' 'ntfs' '' '' 'do_not_format' '' 'on' 2>"$1"
+                        dialog  --no-cancel --ok-label "$($0 locale t187 $lng)" --radiolist "$($0 locale t120 $lng)" '' '' '' 'ext4' '' '' 'btrfs' '' '' 'f2fs' '' '' 'fat' '' '' 'ntfs' '' '' 'do_not_format' '' 'on' 2>"$1"
                         parts_lst=$(echo $parts_lst | sed "s|$tune_part|$tune_part@$(echo $(cat $1))|g")
                     fi
                     if $(cat "$1" | grep -q "btrfs" ); then
-                        dialog  --no-cancel --radiolist 'Specify compression options for btrfs filesystem.\n\nFilesystem compression could save some space and increase reaction speed of operating system even for SSD, but it require a high (single thread) performance of CPU ' '' '' '' 'zlib' 'default, slow' '' 'zlib:9' 'high compr., very slow' '' 'zstd' 'much faster decompr.' '' 'zstd:13' 'high compression' '' 'do_not_compress' '' 'on' 2>"$1"
+                        dialog  --no-cancel --ok-label "$($0 locale t187 $lng)" --radiolist "$($0 locale t121 $lng)" '' '' '' 'zlib' "$($0 locale t122 $lng)" '' 'zlib:9' "$($0 locale t123 $lng)" '' 'zstd' "$($0 locale t124 $lng)" '' 'zstd:13' "$($0 locale t125 $lng)" '' 'do_not_compress' '' 'on' 2>"$1"
                         parts_lst=$(echo $parts_lst | sed "s|$tune_part|$tune_part@$(echo $(cat $1))|g")
                 
                     fi
                     if $(cat "$1" | grep -q "f2fs" ); then
-                        dialog  --colors --no-cancel --checklist 'f2fs provides some functionality, but these must be applied at formatting time.' '' '' '' 'encrypt' 'supp. for fs level encryption' '' 'extra_attr' 'extra attr feature' '' 'project_quota' 'project ID tracking' '' 'inode_checksum' 'inode checksum' '' 'flexible_inline_xattr' 'flexible inline xattr' '' 'quota' 'quotas' '' 'inode_crtime' 'inode creation time' '' 'lost_found' 'lost+found' '' 'sb_checksum' 'superblock checksum' '' 'casefold' 'casefolding  supp.; opt. flags can be passed with -C' '' 'compression' 'sup. for fs level compression' '' 2>"$1"
+                        dialog  --colors --no-cancel --checklist "$($0 locale t126 $lng)" '' '' '' 'encrypt' "$($0 locale t127 $lng)" '' 'extra_attr' "$($0 locale t128 $lng)" '' 'project_quota' "129" '' 'inode_checksum' "$($0 locale t130 $lng)" '' 'flexible_inline_xattr' "$($0 locale t131 $lng)" '' 'quota' "$($0 locale t132 $lng)" '' 'inode_crtime' "$($0 locale t133 $lng)" '' 'lost_found' 'lost+found' '' 'sb_checksum' "$($0 locale t134 $lng)" '' 'casefold' "$($0 locale t135 $lng)" '' 'compression' "$($0 locale t136 $lng)" '' 2>"$1"
                         if $(cat $1 | grep -e 'project_quota' -e 'inode_checksum' -e 'flexible_inline_xattr' -e 'inode_crtime' -e 'compression' -q ) && $(cat $1 | grep -vq extra_attr); then 
                             tmpvar23="extra_attr "
                             tmpvar23+=$(echo $(cat "$1"))
@@ -850,12 +868,12 @@ while [ ! -z "$tmp_menu_cycle00" ]; do
                         read -n 1 -s -r -p "Press any key to continue"
                     fi
                     tmpvar10=$(mk_menu_list "$(echo $(cat "$luks_tests" | grep PBKDF2 | sed 's/PBKDF2-//g' | sed 's/ .*//g'))" "on" "1")
-                    tmpvar10=" dialog --no-cancel --radiolist 'Select hash algorithm' '' '' '' $tmpvar10 " 
+                    tmpvar10=" dialog --no-cancel --ok-label '""$($0 locale t187 $lng)""' --radiolist 'Select hash algorithm' '' '' '' $tmpvar10 " 
                     tmpvar10+=' 2>"'"$1"'"'
                     eval $tmpvar10
                     tmpluksvar="@hash="$(cat "$1")"@"
                     tmpvar10=$(mk_menu_list "$(echo $(tail -n +$(($(cat "$luks_tests" | grep Algorithm -n | sed 's/:.*//g')+1)) "$luks_tests" | sed 's/ /@/g' | sed 's/b@.*/b/g' | sed 's/@@/@/g' | sed 's/@@/@/g' | sed 's/@@/@/g'))" "on" "1")
-                    tmpvar10=" dialog --no-cancel --radiolist 'Select hash algorithm' '' '' '' $tmpvar10 " 
+                    tmpvar10=" dialog --no-cancel --ok-label '""$($0 locale t187 $lng)""' --radiolist 'Select hash algorithm' '' '' '' $tmpvar10 " 
                     tmpvar10=$(echo $tmpvar10 | sed 's/@/ /g')
                     tmpvar10+=' 2>"'"$1"'"'
                     eval $tmpvar10
@@ -869,15 +887,15 @@ while [ ! -z "$tmp_menu_cycle00" ]; do
                 elif $(cat "$1" | grep -q "/" ); then
                     parts_lst=$(echo $parts_lst | sed "s|$tune_part|$tune_part@$(echo $(cat $1))|g")
                     mount_ponts=$(echo $mount_ponts | sed "s|$(cat $1) ||g")
-                    dialog  --no-cancel --radiolist 'Format to filesystem' '' '' '' 'ext4' 'HDD,SSD,pendrive' '' 'btrfs' 'HDD,SSD,pendrive' '' 'f2fs' 'SSD,pendrive' '' 'do_not_format' '' 'on' 2>"$1"
+                    dialog  --no-cancel --ok-label "$($0 locale t187 $lng)" --radiolist "$($0 locale t137 $lng)" '' '' '' 'ext4' 'HDD,SSD,pendrive' '' 'btrfs' 'HDD,SSD,pendrive' '' 'f2fs' 'SSD,pendrive' '' 'do_not_format' '' 'on' 2>"$1"
                     parts_lst=$(echo $parts_lst | sed "s|$tune_part|$tune_part@$(echo $(cat $1))|g")
                     if $(cat "$1" | grep -q "btrfs" ); then
-                        dialog  --no-cancel --radiolist 'Specify compression options for btrfs filesystem.\n\nFilesystem compression could save some space and increase reaction speed of operating system even for SSD, but it require a high (single thread) performance of CPU ' '' '' '' 'zlib' 'default, slow' '' 'zlib:9' 'high compr., very slow' '' 'zstd' 'much faster decompr.' '' 'zstd:13' 'high compression' '' 'do_not_compress' '' 'on' 2>"$1"
+                        dialog  --no-cancel --ok-label "$($0 locale t187 $lng)" --radiolist "$($0 locale t138 $lng)" '' '' '' 'zlib' "$($0 locale t122 $lng)" '' 'zlib:9' "$($0 locale t123 $lng)" '' 'zstd' "$($0 locale t124 $lng)" '' 'zstd:13' "$($0 locale t125 $lng)" '' 'do_not_compress' '' 'on' 2>"$1"
                         parts_lst=$(echo $parts_lst | sed "s|$tune_part|$tune_part@$(echo $(cat $1))|g")
                     fi
                     
                     if $(cat "$1" | grep -q "f2fs" ); then
-                        dialog  --colors --no-cancel --checklist 'f2fs provides some functionality, but these must be applied at formatting time.' '' '' '' 'encrypt' 'supp. for fs level encryption' '' 'extra_attr' 'extra attr feature' '' 'project_quota' 'project ID tracking' '' 'inode_checksum' 'inode checksum' '' 'flexible_inline_xattr' 'flexible inline xattr' '' 'quota' 'quotas' '' 'inode_crtime' 'inode creation time' '' 'lost_found' 'lost+found' '' 'sb_checksum' 'superblock checksum' '' 'casefold' 'casefolding  supp.; opt. flags can be passed with -C' '' 'compression' 'sup. for fs level compression' '' 2>"$1"
+                        dialog  --colors --no-cancel --checklist "$($0 locale t126 $lng)" '' '' '' 'encrypt' "$($0 locale t127 $lng)" '' 'extra_attr' "$($0 locale t128 $lng)" '' 'project_quota' "$($0 locale t129 $lng)" '' 'inode_checksum' "$($0 locale t130 $lng)" '' 'flexible_inline_xattr' "$($0 locale t131 $lng)" '' 'quota' "$($0 locale t132 $lng)" '' 'inode_crtime' "$($0 locale t133 $lng)" '' 'lost_found' 'lost+found' '' 'sb_checksum' "$($0 locale t134 $lng)" '' 'casefold' "$($0 locale t135 $lng)" '' 'compression' "$($0 locale t136 $lng)" '' 2>"$1"
                         if $(cat $1 | grep -e 'project_quota' -e 'inode_checksum' -e 'flexible_inline_xattr' -e 'inode_crtime' -e 'compression' -q ) && $(cat $1 | grep -vq extra_attr); then 
                             tmpvar23="extra_attr "
                             tmpvar23+=$(echo $(cat "$1"))
@@ -966,7 +984,7 @@ cp -f $1 /mnt/$1
 echo '
 exit' >>/mnt/st2run
 chmod +x /mnt/st2run
-arch-chroot /mnt ./st2run
+LANG=$lng arch-chroot /mnt ./st2run
 }
 
 ## ---------------------- ##
@@ -977,28 +995,28 @@ step1(){
 ## select pkgs and install system
 ## $1 - exitstatusfile
 
-pacman -Sy --noconfirm
+LANG=$lng pacman -Sy --noconfirm
 if [ -f ignored.txt ]; then rm -f ignored.txt; fi
 
 ## add a custom selected packages
-dialog --defaultno --no-label " Skip it " --yesno 'You may add some packages to batch-list. Do you want to do it?' '' ''
+dialog --defaultno --no-label "$($0 locale t139 $lng)" --yes-label "$($0 locale t192 $lng)" --yesno "$($0 locale t140 $lng)" '' ''
 if [ $? -ne 1 ]; then
-    dialog --msgbox 'This is a very primitive packages selector. All it can do is add the selected package to the batch list. That is it. The packages are grouped in the same way as in the pacman database.' '' ''
+    dialog --ok-label "$($0 locale t187 $lng)" --msgbox "$($0 locale t141 $lng)" '' ''
 
     paclist=$(mktemp XXXXXX.tmp)
     menustatus=$(mktemp XXXXXX.tmp)
     repo_groups=$(mktemp XXXXXXX.tmp)
     red_rgroups=$(mktemp XXXXXXX.tmp)
     
-    echo get packages list
+    echo "$($0 locale t185 $lng)"
     echo -e $(echo $(pacman -Ss | sed 's@core\/@\\ncore\/@g' | sed 's@extra\/@\\nextra\/@g' | sed 's@community\/@\\ncommunity\/@g')) >$paclist
     
     if [ "$(wc -l $paclist | sed 's/ .*//g')" -le 1000 ]; then
-        dialog --colors --title '\Z1Package selector fail' --msgbox '\nAdditional package could be installed after sytem installation complete.\Zn' '7' '45'
+        dialog --colors --title "$($0 locale t142 $lng)" --msgbox "$($0 locale t143 $lng)" '7' '45'
         rm -f $menustatus $repo_groups $red_rgroups $paclist
     else
     
-        tmpmenuvar242='dialog --nocancel --checklist "Select repo to search" "" "" "" '
+        tmpmenuvar242='dialog --nocancel --checklist "'"$($0 locale t144 $lng)"'" "" "" "" '
         tmpmenuvar242+=$(mk_menu_list "core extra community" "on" "")
         tmpmenuvar242+=' 2>"'"$menustatus"'"'
         eval $tmpmenuvar242
@@ -1016,20 +1034,20 @@ if [ $? -ne 1 ]; then
    
         endselector=0
         while [ $endselector -ne 1 ]; do
-            tmpmenuvar242='dialog --nocancel --radiolist "Select a groupe of packages or a searchbox" "" "" "" '
+            tmpmenuvar242='dialog --nocancel --ok-label "'"$($0 locale t187 $lng)"'" --radiolist "'"$($0 locale t145 $lng)"'" "" "" "" '
             tmpmenuvar242+=$(mk_menu_list "!_SEARCHBOX $(echo $(cat $red_rgroups))" "on" "1")
             tmpmenuvar242+=' 2>"'"$menustatus"'"'
             eval $tmpmenuvar242
             
             if [ "$(cat $menustatus)" != "!_SEARCHBOX" ]; then
-                tmpmenuvar242='dialog --checklist "Select a packages" "" "" "" '
+                tmpmenuvar242='dialog --checklist "'"$($0 locale t146 $lng)"'" "" "" "" '
                 tmpmenuvar242+=$(mk_menu_list "$(echo $(cat $paclist | sed 's|core\/||g' | sed 's|extra\/||g' | sed 's|community\/||g' | grep $(cat $menustatus | sed 's/@/ /g') | sed 's/ .*//g'))" "" "")
                 tmpmenuvar242+=' 2>"'"$menustatus"'"'
                 eval $tmpmenuvar242
             else
-                dialog --no-cancel --title "Packages search box" --inputbox "\nWhat are you missing?\n\n(3 or more letters prefered)" '' '' "bash" 2>"$menustatus"
+                dialog --no-cancel --title "$($0 locale t147 $lng)" --ok-label "$($0 locale t187 $lng)" --inputbox "$($0 locale t148 $lng)" '' '' "bash" 2>"$menustatus"
                 
-                tmpmenuvar242='dialog --checklist "Select a packages" "" "" "" '
+                tmpmenuvar242='dialog --checklist "'"$($0 locale t146 $lng)"'" "" "" "" '
                 tmpmenuvar242+=$(mk_menu_list "$(echo $(cat $paclist | sed 's|core\/||g' | sed 's|extra\/||g' | sed 's|community\/||g' | grep $(cat $menustatus) | sed 's/ .*//g'))" "" "")
                 tmpmenuvar242+=' 2>"'"$menustatus"'"'
                 eval $tmpmenuvar242
@@ -1042,7 +1060,7 @@ if [ $? -ne 1 ]; then
                     fi
                 done
             fi
-            dialog --yesno 'Exit from here?' '' ''
+            dialog --yes-label "$($0 locale t192 $lng)" --no-label "$($0 locale t193 $lng)" --yesno "$($0 locale t149 $lng)" '' ''
             if [ $? -ne 1 ]; then endselector=1; fi
         done
         
@@ -1051,7 +1069,7 @@ if [ $? -ne 1 ]; then
 fi
 
 echo ''>$1
-echo checking pkg availability
+echo "$($0 locale t186 $lng)"
 tmp_max_thrd=$(($(grep "model name" /proc/cpuinfo --count)+1))
 tmp_thrd_count=0
 for i in $(cat "$batchlist" | grep -vx "$(pacman -Qqe)"); do
@@ -1068,15 +1086,15 @@ wait
 cp -f $1 $batchlist
 
 if [ -e ignored.txt ];then
-    dialog --colors --title 'Unavailable packages' --msgbox "\n$(echo $(cat ignored.txt)) \n\n\ZbIt seems the 'batchlist' a little bit outdated.\nYou can install alternatives manually or try without them.\Zn" '' ''
+    dialog --colors --title "$($0 locale t150 $lng)" --ok-label "$($0 locale t187 $lng)" --msgbox "\n$(echo $(cat ignored.txt)) $($0 locale t151 $lng)" '' ''
     cp -f ignored.txt /mnt/ignored.txt
     clear
 fi
 cp -f $batchlist /mnt/$batchlist
 
 ## batch installation
-pacstrap /mnt base $(echo $(cat $batchlist))
-genfstab -U /mnt >> /mnt/etc/fstab
+LANG=$lng pacstrap /mnt base $(echo $(cat $batchlist))
+LANG=$lng genfstab -U /mnt >> /mnt/etc/fstab
 }
 
 ## ---------------------- ##
@@ -1089,19 +1107,19 @@ step2(){
 ## $1 - exitstatusfile
 
 echo ''>$1
-dialog  --no-cancel --inputbox "Specify a hostname" '' '' "test" 2>"$1"
+dialog  --no-cancel --ok-label "$($0 locale t187 $lng)" --inputbox "$($0 locale t152 $lng)" '' '' "test" 2>"$1"
 echo $(cat $1) > /mnt/etc/hostname
 
 echo ''>$1
-tmpvar01='dialog --no-cancel --radiolist "Select timezone" "" "" "" '
+tmpvar01='dialog --no-cancel --ok-label "'"$($0 locale t187 $lng)"'" --radiolist "'"$($0 locale t153 $lng)"'" "" "" "" '
 tmpvar01+=$(mk_menu_list "$(echo $(find /mnt/usr/share/zoneinfo/ | sed 's|.*zoneinfo\/||g' | grep -v right| grep -v 'posix/' | grep "[A-Z]"))" "" "")
 tmpvar01+=' 2>"'"$1"'"'
 eval $tmpvar01
 if [ -f /mnt/etc/localtime ]; then rm -r /mnt/etc/localtime; fi
 ln -s /mnt/usr/share/zoneinfo/$(cat $1) /mnt/etc/localtime
 echo ''>$1
-tmpvar01='dialog --no-cancel --checklist "Select locales" "" "" "" '
-tmpvar01+='"en_US.UTF-8@UTF-8" "" "on" "uk_UA.UTF-8@UTF-8" "" "" "ru_RU.UTF-8@UTF-8" "" "" '
+tmpvar01='dialog --no-cancel --checklist "'"$($0 locale t154 $lng)"'" "" "" "" '
+tmpvar01+='"en_US.UTF-8@UTF-8" "" "on" "uk_UA.UTF-8@UTF-8" "" "on" "ru_RU.UTF-8@UTF-8" "" "" '
 tmpvar01+=$(mk_menu_list "$(echo $(cat /mnt/etc/locale.gen | grep "#[a-z,A-Z]" | sed 's/#//g' | sed 's/ /@/g' | sed 's/@@//g'))" "" "")
 tmpvar01+=' 2>"'"$1"'"'
 eval $tmpvar01
@@ -1114,67 +1132,67 @@ for i in $(cat "'$1'"); do
         echo $tmpvar22 >> /etc/locale.gen
     fi
 done
-locale-gen' >/mnt/st2run
+'LANG=$lng' locale-gen' >/mnt/st2run
 clear
 runchr "$1"
 
-dialog  --no-cancel --inputbox "Specify a user name" '' '' "user" 2>"$1"
+dialog  --no-cancel --ok-label "$($0 locale t187 $lng)" --inputbox "$($0 locale t155 $lng)" '' '' "user" 2>"$1"
 clear
 user_name=$(cat "$1")
 echo 'user_name='$user_name'
-useradd -m -g users -s /bin/bash $user_name' >/mnt/st2run
+'LANG=$lng' useradd -m -g users -s /bin/bash $user_name' >/mnt/st2run
 runchr "$1"
 
-dialog --colors --msgbox '\Z1This script does not ask for your password.\n\nYou will be forced to enter the password directly to passwd.\Zn' '9' '35'
+dialog --colors --ok-label "$($0 locale t187 $lng)" --msgbox "$($0 locale t156 $lng)" '9' '35'
 echo 'clear
-echo "enter a new password for user:" '$user_name'
-passwd '$user_name'' >/mnt/st2run
+echo "'"$($0 locale t157 $lng)"'" '$user_name'
+'LANG=$lng' passwd '$user_name'' >/mnt/st2run
 runchr "$1"
 
 echo ''> "$1"
 tmpmenuvar256=$(mktemp /tmp/XXXXXXX.tmp)
-dialog --nocancel --checklist 'Select tasks to perform' '' '' '' \
-"01" "add '$user_name' to sys group" "on" \
-"02" "add '$user_name' to wheel group" "on" \
-"03" "add '$user_name' to optical group" "on" \
-"04" "add '$user_name' to lp group" "on" \
-"05" "add '$user_name' to SUDO" "on" \
-"06" "disable dhcpcd enable networkmanager/wicd" "on" \
-"07" "enable sddm/lxdm" "on" \
-"08" "enable cups when installed" "on" \
-"09" "set ua-lang and uniCyr-font for console" "" \
-"10" "add en uk ru layouts to xkeyboard" "" \
-"11" "enable smp makepkg" "on" \
-"12" "enable mtune=native as default" "" \
-"13" "add multithreads compression for make pkg" "on" \
-"14" "add zswap to grub default" "on" \
-"15" "change grub colors" "on" \
-"16" "add drivers to initrd" "on" \
-"17" "change hooks" "on" \
-"18" "enable colors for pacman" "on" \
-"19" "set hw clock to localtime" "" \
-"20" "disable tmp in ram" "" \
-"21" "set all usb dev int affinity to 1 cpu core" "" \
-"22" "disable root" "on" \
-"23" "disable avahi-daemon.service" "" \
-"24" "disable lvm2-services" "" \
-"25" "disable systemd-journald.service" "" 2>"$tmpmenuvar256"
+dialog --nocancel --checklist "$($0 locale t158 $lng)" '' '' '' \
+"01" "$($0 locale t159 $lng) '$user_name' $($0 locale t160 $lng) sys $($0 locale t161 $lng)" "on" \
+"02" "$($0 locale t159 $lng) '$user_name' $($0 locale t160 $lng) wheel $($0 locale t161 $lng)" "on" \
+"03" "$($0 locale t159 $lng) '$user_name' $($0 locale t160 $lng) optical $($0 locale t161 $lng)" "on" \
+"04" "$($0 locale t159 $lng) '$user_name' $($0 locale t160 $lng) lp $($0 locale t161 $lng)" "on" \
+"05" "$($0 locale t159 $lng) '$user_name' $($0 locale t160 $lng) SUDO" "on" \
+"06" "$($0 locale t162 $lng)" "on" \
+"07" "$($0 locale t163 $lng)" "on" \
+"08" "$($0 locale t164 $lng)" "on" \
+"09" "$($0 locale t165 $lng)" "" \
+"10" "$($0 locale t166 $lng)" "" \
+"11" "$($0 locale t167 $lng)" "on" \
+"12" "$($0 locale t168 $lng)" "" \
+"13" "$($0 locale t169 $lng)" "on" \
+"14" "$($0 locale t170 $lng)" "on" \
+"15" "$($0 locale t171 $lng)" "on" \
+"16" "$($0 locale t172 $lng)" "on" \
+"17" "$($0 locale t173 $lng)" "on" \
+"18" "$($0 locale t174 $lng)" "on" \
+"19" "$($0 locale t175 $lng)" "" \
+"20" "$($0 locale t176 $lng)" "" \
+"21" "$($0 locale t177 $lng)" "" \
+"22" "$($0 locale t178 $lng)" "on" \
+"23" "$($0 locale t179 $lng)" "" \
+"24" "$($0 locale t180 $lng)" "" \
+"25" "$($0 locale t181 $lng)" "" 2>"$tmpmenuvar256"
 clear
 
 if $(cat "$tmpmenuvar256" | grep -q "01"); then
-    echo "gpasswd -a $user_name sys" >/mnt/st2run
+    echo "LANG=$lng gpasswd -a $user_name sys" >/mnt/st2run
     runchr "$1"
 fi
 if $(cat "$tmpmenuvar256" | grep -q "02"); then
-    echo "gpasswd -a $user_name wheel" >/mnt/st2run
+    echo "LANG=$lng gpasswd -a $user_name wheel" >/mnt/st2run
     runchr "$1"
 fi
 if $(cat "$tmpmenuvar256" | grep -q "03"); then
-    echo "gpasswd -a $user_name optical" >/mnt/st2run
+    echo "LANG=$lng gpasswd -a $user_name optical" >/mnt/st2run
     runchr "$1"
 fi
 if $(cat "$tmpmenuvar256" | grep -q "04"); then
-    echo "gpasswd -a $user_name lp" >/mnt/st2run
+    echo "LANG=$lng gpasswd -a $user_name lp" >/mnt/st2run
     runchr "$1"
 fi
 if $(cat "$tmpmenuvar256" | grep -q "05")&&[ -f /mnt/etc/sudoers ]; then
@@ -1183,23 +1201,23 @@ if $(cat "$tmpmenuvar256" | grep -q "05")&&[ -f /mnt/etc/sudoers ]; then
 fi
 if $(cat "$tmpmenuvar256" | grep -q "06"); then
     echo 'if [ -f /usr/lib/systemd/system/NetworkManager.service ]; then
-        systemctl disable dhcpcd 
-        systemctl enable NetworkManager.service
+        'LANG=$lng' systemctl disable dhcpcd 
+        'LANG=$lng' systemctl enable NetworkManager.service
     elif [ -f /usr/lib/systemd/system/wicd.service ]; then
-        systemctl enable wicd.service
+        'LANG=$lng' systemctl enable wicd.service
     fi' >/mnt/st2run
     runchr "$1"
 fi
 if $(cat "$tmpmenuvar256" | grep -q "07"); then
     echo 'if [ -f /usr/lib/systemd/system/sddm.service ]; then
-        systemctl enable sddm.service
+        'LANG=$lng' systemctl enable sddm.service
     elif [ -f /usr/lib/systemd/system/lxdm.service ]; then
-        systemctl enable lxdm.service
+        'LANG=$lng' systemctl enable lxdm.service
     fi' >/mnt/st2run
     runchr "$1"
 fi
 if $(cat "$tmpmenuvar256" | grep -q "08")&&[ -f /mnt/usr/lib/systemd/system/org.cups.cupsd.service ]; then
-    echo 'systemctl enable org.cups.cupsd.service' >/mnt/st2run
+    echo LANG=$lng' systemctl enable org.cups.cupsd.service' >/mnt/st2run
     runchr "$1"
 fi
 if $(cat "$tmpmenuvar256" | grep -q "09"); then
@@ -1260,11 +1278,11 @@ if $(cat "$tmpmenuvar256" | grep -q "18"); then
     cat /mnt/etc/pacman.conf.orig | sed -e 's/#Color/Color/g' >/mnt/etc/pacman.conf
 fi
 if $(cat "$tmpmenuvar256" | grep -q "19"); then
-    echo 'timedatectl set-local-rtc 1' >/mnt/st2run
+    echo LANG=$lng' timedatectl set-local-rtc 1' >/mnt/st2run
     runchr "$1"
 fi
 if $(cat "$tmpmenuvar256" | grep -q "20"); then
-    echo 'systemctl mask tmp.mount' >/mnt/st2run
+    echo LANG=$lng' systemctl mask tmp.mount' >/mnt/st2run
     runchr "$1"
 fi
 if $(cat "$tmpmenuvar256" | grep -q "21"); then
@@ -1286,51 +1304,51 @@ ExecStart=$script_path$serv_name
 WantedBy=multi-user.target 
 
 " >/mnt/usr/lib/systemd/system/$serv_name.service
-    echo "systemctl enable $serv_name.service" >/mnt/st2run
+    echo "LANG=$lng systemctl enable $serv_name.service" >/mnt/st2run
     runchr "$1"
 fi
 if $(cat "$tmpmenuvar256" | grep -q "22"); then
-    echo 'passwd -l root' >/mnt/st2run
+    echo LANG=$lng' passwd -l root' >/mnt/st2run
     runchr "$1"
 fi
 if $(cat "$tmpmenuvar256" | grep -q "23"); then
-    echo 'systemctl status avahi-daemon.service' >/mnt/st2run
+    echo LANG=$lng' systemctl status avahi-daemon.service' >/mnt/st2run
     runchr "$1"
 fi
 if $(cat "$tmpmenuvar256" | grep -q "24"); then
-    echo 'systemctl disable lvm2-lvmetad.service'>/mnt/st2run
-    echo 'systemctl disable lvm2-monitor.service' >>/mnt/st2run
+    echo LANG=$lng' systemctl disable lvm2-lvmetad.service'>/mnt/st2run
+    echo LANG=$lng' systemctl disable lvm2-monitor.service' >>/mnt/st2run
     runchr "$1"
 fi
 if $(cat "$tmpmenuvar256" | grep -q "25"); then
-    echo 'systemctl disable systemd-journald.service' >/mnt/st2run
+    echo LANG=$lng' systemctl disable systemd-journald.service' >/mnt/st2run
     runchr "$1"
 fi
 rm -f $tmpmenuvar256
-echo "chown -R $user_name /home/$user_name" > /mnt/st2run
+echo "LANG=$lng chown -R $user_name /home/$user_name" > /mnt/st2run
 runchr "$1"
 
 ## install bootloader
 if [ -d /mnt/boot/efi ]; then
-    echo 'pacman -S efibootmgr --noconfirm --needed 
-    grub-install --target=x86_64-efi' >/mnt/st2run
+    echo LANG=$lng' pacman -S efibootmgr --noconfirm --needed 
+    'LANG=$lng' grub-install --target=x86_64-efi' >/mnt/st2run
     runchr "$1"    
 else
     echo ''>$1
     #tmpvar02=testdik.img
     #tmpvar02=$(echo $(ls /dev/disk/by-id | grep -v part | grep -v wwn))
     tmpvar02=$(echo $(ls /dev | grep -e 'sd' -e 'mmc' | grep -v "[1-9]"))
-    tmpvar01='dialog --no-cancel --radiolist "Select disk to install GRUB bootloader" "" "" "" '
+    tmpvar01='dialog --no-cancel  --ok-label "'"$($0 locale t187 $lng)"'" --radiolist "'"$($0 locale t182 $lng)"'" "" "" "" '
     tmpvar01+=$(mk_menu_list "$tmpvar02" "" "")
     tmpvar01+=' 2>"'"$1"'"'
     eval $tmpvar01
     clear
-    echo 'grub-install /dev/$(cat '$1' | sed "s/ //g")' >/mnt/st2run
+    echo LANG=$lng' grub-install /dev/$(cat '$1' | sed "s/ //g")' >/mnt/st2run
     runchr "$1"
 fi
 
-echo 'mkinitcpio -p linux
-grub-mkconfig -o /boot/grub/grub.cfg' >/mnt/st2run
+echo LANG=$lng' mkinitcpio -p linux
+'LANG=$lng' grub-mkconfig -o /boot/grub/grub.cfg' >/mnt/st2run
 runchr "$1"
 }
 
@@ -1338,8 +1356,891 @@ runchr "$1"
 ## next internal function ##
 ## ---------------------- ##
 
-
-
+locale(){
+if [ "$2" == "C" ]; then
+case $1 in
+    t050)
+        echo 'Accept the risks'
+    ;;
+    t051)
+        echo 'Do NOT accept'
+    ;;
+    t052)
+        echo 'Disclaimer.'
+    ;;
+    t053)
+        echo '\n\Z1\ZrBy using this script you must accept potential risks of loss all your data.\n\nThe better way to save your data is to make backups to external storages.\n\nThere are no any guarantees. That means script provided As Is\Zn'
+    ;;
+    t054)
+        echo '  Got it  '
+    ;;
+    t055)
+        echo '\Z1\Zrnon official\Zn Arch Linux batch-list installation script tool. \Z3https://[github,gitlab].com/quarkscript\Zn\nCreator Andrew S.\nLicense GPL\n\nIt seems \n- this is not an Arch Linux or at least pacman did not installed.\n\nYou may try fdisk_gui, but without root privileges it will fail.'
+    ;;
+    t056)
+        echo '\Z1\Zrnon official\Zn Arch Linux batch-list installation script tool. \Z3https://[github,gitlab].com/quarkscript\Zn\nCreator Andrew S.\nLicense GPL\n\nWhat do you want to do?   (Use space button to select item)'
+    ;;
+    t057)
+        echo 'packages list from runned arch linux system'
+    ;;
+    t058)
+        echo 'due to batch list'
+    ;;
+    t059)
+        echo 'images (in development)'
+    ;;
+    t060)
+        echo 'It seems like you are tries to install\n a new OS from existed Arch Linux.\nTo do that you need install\n "arch-install-scripts" before.\nAnd run this again with root privileges'
+    ;;
+    t061)
+        echo 'Error'
+    ;;
+    t062)
+        echo "\Z1Nothing mounted to /mnt. Installation fail.\n\n\ZnYou need to select a partition for '/' on 'Simple disk formatter and mounter' menu or mount the future root partition to /mnt manually before executing"
+    ;;
+    t063)
+        echo ' Reboot '
+    ;;
+    t064)
+        echo 'Now you can reboot and try the new system.\n\nWhen all is good, you will get a bootable and functional OS. Otherwise there might not be enough free space or something failed.'
+    ;;
+    t065)
+        echo 'MakeArm images possible development in future'
+    ;;
+    t066)
+        echo 'is already existed, owerwrite it?'
+    ;;
+    t067)
+        echo 'Warning'
+    ;;
+    t068)
+        echo 'does not found A new'
+    ;;
+    t069)
+        echo 'will be created from template. Wich template do you want to use?'
+    ;;
+    t070)
+        echo 'The packagelist. Do you wish to exclude something from here? just deselect it.'
+    ;;
+    t071)
+        echo '\nSimple fdisk gui. \Z1Use it with cautions.\Zn \n\nIf you are do not understand what is this for then press No. \nOtherwise you may \Z1\Zrdestroy all data\Zn from all your hard drives.\Zn \nYou have been warned.\n\nThis script provide a few basic functions. \nIf you need more than that run fdisk directly. \n\nDo you wish to continue?'
+    ;;
+    t072)
+        echo 'Select disk to process'
+    ;;
+    t073)
+        echo 'Looks like disk is empty'
+    ;;
+    t074)
+        echo 'Select partition table type'
+    ;;
+    t075)
+        echo ' - create a new empty DOS partition table (boot from BIOS)'
+    ;;
+    t076)
+        echo ' - create a new empty GPT partition table (boot from UEFI)'
+    ;;
+    t077)
+        echo 'Do you want to re-create \na partitions table?\n\n\Z1All existed data will be lost\Zn.'
+    ;;
+    t078)
+        echo 'Select partition table type'
+    ;;
+    t079)
+        echo ' - boot from BIOS'
+    ;;
+    t080)
+        echo ' - boot from UEFI'
+    ;;
+    t081)
+        echo ' Write ALL changes and exit'
+    ;;
+    t082)
+        echo ' Discard ANY changes and exit'
+    ;;
+    t083)
+        echo 'Select partition or free space \n\nUse arrow keys, space-key and enter.'
+    ;;
+    t084)
+        echo 'Start Sector of new DOS logical partition'
+    ;;
+    t085)
+        echo '\nChoose a start sector'
+    ;;
+    t086)
+        echo 'End sector of new DOS partition'
+    ;;
+    t087)
+        echo 'Something wrong with entered values.'
+    ;;
+    t088)
+        echo 'select type of new partition'
+    ;;
+    t089)
+        echo 'Primary'
+    ;;
+    t090)
+        echo 'Extended'
+    ;;
+    t091)
+        echo 'Start sector of new DOS partition'
+    ;;
+    t092)
+        echo '\nChoose a start sector'
+    ;;
+    t093)
+        echo 'End sector of new DOS partition'
+    ;;
+    t094)
+        echo 'New GPT partition start sector'
+    ;;
+    t095)
+        echo '\nChoose a start sector'
+    ;;
+    t096)
+        echo 'New GPT partition end sector'
+    ;;
+    t097)
+        echo 'Edit partition menu'
+    ;;
+    t098)
+        echo 'delete partition'
+    ;;
+    t099)
+        echo 'change partition type'
+    ;;
+    t100)
+        echo 'turn on boot flag'
+    ;;
+    t101)
+        echo '\Z1Warning! Removing Extended partition leads to remove all logical partitions!\Zn\n\nDo you wish to proceed?'
+    ;;
+    t102)
+        echo 'Change DOS partition TYPE menu\nsome partition types may fail this script'
+    ;;
+    t103)
+        echo 'Change GPT partition TYPE menu'
+    ;;
+    t104)
+        echo '\Z1.... Are you sure? ....\n\nChanges will be writed.\n\nAll data from modified\npartitions will be \Zrlost\Zn'
+    ;;
+    t105)
+        echo ' What is your next step?'
+    ;;
+    t106)
+        echo 'select another disk to edit'
+    ;;
+    t107)
+        echo 'exit from fdisk simple gui'
+    ;;
+    t108)
+        echo '\nSimple disk formatter and mounter. \Z1Use it with cautions.\Zn \n\nYou still can \Z1\Zrdestroy all data\Zn from all your hard drives.\Zn \nYou have been warned.\n\nThis script provide a few basic functions. \nIf you need more than that use command promt directly. \n\nDo you wish to continue?'
+    ;;
+    t109)
+        echo 'Select disk to process'
+    ;;
+    t110)
+        echo ' Exit '
+    ;;
+    t111)
+        echo 'Looks like disk is empty.\nFormat and mount disk without\npartitions unsupported now.'
+    ;;
+    t112)
+        echo 'This partition is already in use.\n\nSelect another or discard changes and run script again.'
+    ;;
+    t113)
+        echo "\Z1WARNING! No root partition '/' is specified\Zn\n\nWithout rootfs installation by this script will fail on next steps"
+    ;;
+    t114)
+        echo 'How to use a partition?\n/ and /boot mount points encryption\nis not supported by this script'
+    ;;
+    t115)
+        echo 'Format to filesystem'
+    ;;
+    t116)
+        echo 'use when no other OS is installed'
+    ;;
+    t117)
+        echo 'use when other OS is already installed'
+    ;;
+    t118)
+        echo 'Specify a custom mount point'
+    ;;
+    t119)
+        echo '\nDo not use special symbols space and @, otherwise result will be unpredicted.\n And do not use it like /dir1/dir2... currently it is unsupported and could lead to fail. '
+    ;;
+    t120)
+        echo 'Format to filesystem'
+    ;;
+    t121)
+        echo 'Specify compression options for btrfs filesystem.\n\nFilesystem compression could save some space and increase reaction speed of operating system even for SSD, but it require a high (single thread) performance of CPU '
+    ;;
+    t122)
+        echo 'default, slow'
+    ;;
+    t123)
+        echo 'high compr., very slow'
+    ;;
+    t124)
+        echo 'much faster decompr.'
+    ;;
+    t125)
+        echo 'high compression'
+    ;;
+    t126)
+        echo 'f2fs provides some functionality, but these must be applied at formatting time.'
+    ;;
+    t127)
+        echo 'supp. for fs level encryption'
+    ;;
+    t128)
+        echo 'extra attr feature'
+    ;;
+    t129)
+        echo 'project ID tracking'
+    ;;
+    t130)
+        echo 'inode checksum'
+    ;;
+    t131)
+        echo 'flexible inline xattr'
+    ;;
+    t132)
+        echo 'quotas'
+    ;;
+    t133)
+        echo 'inode creation time'
+    ;;
+    t134)
+        echo 'superblock checksum'
+    ;;
+    t135)
+        echo 'casefolding  supp.; opt. flags can be passed with -C'
+    ;;
+    t136)
+        echo 'sup. for fs level compression'
+    ;;
+    t137)
+        echo 'Format to filesystem'
+    ;;
+    t138)
+        echo 'Specify compression options for btrfs filesystem.\n\nFilesystem compression could save some space and increase reaction speed of operating system even for SSD, but it require a high (single thread) performance of CPU '
+    ;;
+    t139)
+        echo ' Skip it '
+    ;;
+    t140)
+        echo 'You may add some packages to batch-list. Do you want to do it?'
+    ;;
+    t141)
+        echo 'This is a very primitive packages selector. All it can do is add the selected package to the batch list. That is it. The packages are grouped in the same way as in the pacman database.'
+    ;;
+    t142)
+        echo '\Z1Package selector fail'
+    ;;
+    t143)
+        echo '\nAdditional package could be installed after sytem installation complete.\Zn'
+    ;;
+    t144)
+        echo 'Select repo to search'
+    ;;
+    t145)
+        echo 'Select a groupe of packages or a searchbox'
+    ;;
+    t146)
+        echo 'Select a packages'
+    ;;
+    t147)
+        echo 'Packages search box'
+    ;;
+    t148)
+        echo '\nWhat are you missing?\n\n(3 or more letters prefered)'
+    ;;
+    t149)
+        echo 'Exit from here?'
+    ;;
+    t150)
+        echo 'Unavailable packages'
+    ;;
+    t151)
+        echo "\n\n\ZbIt seems the 'batchlist' a little bit outdated.\nYou can install alternatives manually or try without them.\Zn"
+    ;;
+    t152)
+        echo 'Specify a hostname'
+    ;;
+    t153)
+        echo 'Select timezone'
+    ;;
+    t154)
+        echo 'Select locales'
+    ;;
+    t155)
+        echo 'Specify a user name'
+    ;;
+    t156)
+        echo '\Z1This script does not ask for your password.\n\nYou will be forced to enter the password directly to passwd.\Zn'
+    ;;
+    t157)
+        echo 'enter a new password for user:'
+    ;;
+    t158)
+        echo 'Select tasks to perform'
+    ;;
+    t159)
+        echo 'add'
+    ;;
+    t160)
+        echo 'to'
+    ;;
+    t161)
+        echo 'group'
+    ;;
+    t162)
+        echo 'disable dhcpcd enable networkmanager/wicd'
+    ;;
+    t163)
+        echo 'enable sddm/lxdm'
+    ;;
+    t164)
+        echo 'enable cups when installed'
+    ;;
+    t165)
+        echo 'set ua-lang and uniCyr-font for console'
+    ;;
+    t166)
+        echo 'add en uk ru layouts to xkeyboard'
+    ;;
+    t167)
+        echo 'enable smp makepkg'
+    ;;
+    t168)
+        echo 'enable mtune=native as default'
+    ;;
+    t169)
+        echo 'add multithreads compression for make pkg'
+    ;;
+    t170)
+        echo 'add zswap to grub default'
+    ;;
+    t171)
+        echo 'change grub colors'
+    ;;
+    t172)
+        echo 'add drivers to initrd'
+    ;;
+    t173)
+        echo 'change hooks'
+    ;;
+    t174)
+        echo 'enable colors for pacman'
+    ;;
+    t175)
+        echo 'set hw clock to localtime'
+    ;;
+    t176)
+        echo 'disable tmp in ram'
+    ;;
+    t177)
+        echo 'set all usb dev int affinity to 1 cpu core'
+    ;;
+    t178)
+        echo 'disable root'
+    ;;
+    t179)
+        echo 'disable avahi-daemon.service'
+    ;;
+    t180)
+        echo 'disable lvm2-services'
+    ;;
+    t181)
+        echo 'disable systemd-journald.service'
+    ;;
+    t182)
+        echo 'Select disk to install GRUB bootloader'
+    ;;
+    t183)
+        echo 'or +/-sectors or +/-size{K,M,G,T,P}\n(current hard drive sector size is'
+    ;;
+    t184)
+        echo 'bytes'
+    ;;
+    t185)
+        echo 'get packages list'
+    ;;
+    t186)
+        echo 'checking pkg availability'
+    ;;
+    t187)
+        echo 'Ok'
+    ;;
+    t188)
+        echo 'Cancel'
+    ;;
+    t189)
+        echo 'Select partition'
+    ;;
+    t190)
+        echo ' Select another disk (discard current)'
+    ;;
+    t191)
+        echo 'How to use a partition?'
+    ;;
+    t192)
+        echo 'Yes'
+    ;;
+    t193)
+        echo 'No'
+    ;;
+    t194)
+        echo 'Agree'
+    ;;
+    *)
+        echo 'String not found'
+    ;;
+esac
+elif [ "$2" == "uk_UA.UTF-8" ]; then
+case $1 in
+    t050)
+        echo ' Прийняти ризики '
+    ;;
+    t051)
+        echo ' Не приймати ризики '
+    ;;
+    t052)
+        echo 'Відмова від відповідальності.'
+    ;;
+    t053)
+        echo '\n\Z1\ZrВикористовуючи цю програму ви повинні прийняти потенційні ризики втрати усіх своїх даних.\n\nНайкращій метод зберегти дані це зробити резервні копії на зовнішніх носіях.\n\nЖодної гарантії на роботу програми. Що означає ніяких претензій не приймається.\Zn \nХіба що звіти про помилки...'
+    ;;
+    t054)
+        echo '  Зрозуміло  '
+    ;;
+    t055)
+        echo '\Z1\Zrнеофіційний\Zn встановлювач пакетом Арч Лінукса. \n\Z3https://[github,gitlab].com/quarkscript\Zn\nТворець Андрій С.\nЛіцензія GPL\n\nВиглядає так що \n ця програма виконується не з під Арч Лінукса або pacman не встановлений.\n\n Без pacman-a нічого не вийде.'
+    ;;
+    t056)
+        echo '\Z1\Zrнеофіційний\Zn встановлювач пакетом Арч Лінукса. \n\Z3https://[github,gitlab].com/quarkscript\Zn\nТворець Андрій С.\nЛіцензія GPL\n\nДоступні дії:   (Використовуйте пробіл для обрання дії)'
+    ;;
+    t057)
+        echo 'Створити перелік пакунків з цієї системи'
+    ;;
+    t058)
+        echo 'Встановити систему відповідно переліку пакунків'
+    ;;
+    t059)
+        echo 'Створити образ (можливо в розробці)'
+    ;;
+    t060)
+        echo "Виглядає так, що ви намагаєтесь встановити\n нову систему з встановленого Арч Линуксу.\nЩоб це зробити необхідно попередньо\n встановити 'arch-install-scripts'.\nТа повторно запустити цю програму з правами суперкористувача."
+    ;;
+    t061)
+        echo 'Помилка'
+    ;;
+    t062)
+        echo "\Z1Нічого не змонтовано до /mnt. Встановлення неможливе.\n\n\ZnВам необхідно обрати розділ диска для '/' використавши наприклад 'Спрощений форматувальник дисків та монтувальник' або змонтувати майбутні розділи до /mnt вручну, до запуску цієї програми"
+    ;;
+    t063)
+        echo ' Перезавантаження '
+    ;;
+    t064)
+        echo 'Тепер ви можете перезавантажити систему.\n\nЯкщо все пройшло добре то ви отримаєте повноцінну систему. Інакше трапились якісь проблеми, не вистачило місця тощо.'
+    ;;
+    t065)
+        echo 'MakeArm Створити образ диску для арм (у розробці.. можливо)'
+    ;;
+    t066)
+        echo 'вже існує, перезаписати?'
+    ;;
+    t067)
+        echo 'Попередження'
+    ;;
+    t068)
+        echo 'не знайдено. Новий'
+    ;;
+    t069)
+        echo 'буде створено з шаблону. Який шаблон ви бажаєте використати?'
+    ;;
+    t070)
+        echo 'Пакетний перелік. Бажаєте щось виключити? - просто зніміть зірочку.'
+    ;;
+    t071)
+        echo '\nПроста оболонка для fdisk. \Z1Використовуйте обережно.\Zn \n\nЯкщо ви не розумієте для чого це - кращє натисніть  No. \nІнакше ви можете \Z1\Zrзнищіти усі свої дані\Zn з усіх підключених накопичувачів.\Zn \nВас попередили.\n\nЦя програма виконує лише декілька простих операцій. \nЯкщо вам потрібно більше, то використовуйте fdisk безпосередньо. \n\nВи бажаєте продовжити?'
+    ;;
+    t072)
+        echo 'Оберіть диск для розділення'
+    ;;
+    t073)
+        echo 'Схоже що диск зовсім чистий'
+    ;;
+    t074)
+        echo 'Оберіть таблицю розділів'
+    ;;
+    t075)
+        echo ' - створити нову таблицю розділів DOS (завантаження з BIOS)'
+    ;;
+    t076)
+        echo ' - створити нову таблицю розділів GPT (завантаження з UEFI)'
+    ;;
+    t077)
+        echo 'Ви бажаєте повторно створити \nтаблицю розділів?\n\n\Z1Усі дані буде втрачено\Zn.'
+    ;;
+    t078)
+        echo 'Оберіть тип таблиці'
+    ;;
+    t079)
+        echo ' - завантаження з BIOS'
+    ;;
+    t080)
+        echo ' - завантаження з UEFI'
+    ;;
+    t081)
+        echo ' Записати все та вийти'
+    ;;
+    t082)
+        echo ' Скасувати всі зміни та вийти'
+    ;;
+    t083)
+        echo 'Оберіть розділ або вільне місце \n\nВикористовуючи стрілки, пробіл та enter.'
+    ;;
+    t084)
+        echo 'Початковий сектор нового логічного розділу DOS'
+    ;;
+    t085)
+        echo '\nВведіть початковий сектор'
+    ;;
+    t086)
+        echo 'Останній сектор нового розділу DOS'
+    ;;
+    t087)
+        echo 'Щось пішло не так з введеними даними.'
+    ;;
+    t088)
+        echo 'оберіть тип нового розділу'
+    ;;
+    t089)
+        echo 'Основний'
+    ;;
+    t090)
+        echo 'Розширений'
+    ;;
+    t091)
+        echo 'Початковий сектор нового розділу DOS'
+    ;;
+    t092)
+        echo '\nВведіть початковий сектор'
+    ;;
+    t093)
+        echo 'Останній сектор нового розділу DOS'
+    ;;
+    t094)
+        echo 'Початковий сектор нового розділу GPT'
+    ;;
+    t095)
+        echo '\nВведіть початковий сектор'
+    ;;
+    t096)
+        echo 'Останній сектор нового розділу GPT'
+    ;;
+    t097)
+        echo 'Меню редагування розділу'
+    ;;
+    t098)
+        echo 'видалити розділ'
+    ;;
+    t099)
+        echo 'змінити тип розділу'
+    ;;
+    t100)
+        echo 'увімкнути прапорець завантаження'
+    ;;
+    t101)
+        echo '\Z1Попередження! Видалення розширеного розділу призведе до видалення усіх логічних розділів!\Zn\n\nВи впевнені?'
+    ;;
+    t102)
+        echo 'Зміна типу розділу DOS\nдеякі значення можуть викликати помилки'
+    ;;
+    t103)
+        echo 'Зміна типу розділу GPT'
+    ;;
+    t104)
+        echo '\Z1.... Ви впевнені? ....\n\nЗміни будуть записані.\n\nУсі дані з редагованих\nрозділів будуть \Zrвтрачені\Zn'
+    ;;
+    t105)
+        echo ' Що робити далі?'
+    ;;
+    t106)
+        echo 'Обрати інший диск для редагування'
+    ;;
+    t107)
+        echo 'вийти з оболонки fdisk'
+    ;;
+    t108)
+        echo '\nСпрощений форматувальник дисків та монтувальник. \Z1Використовуйте обережно.\Zn \n\nВи все ще взмозі \Z1\Zrзнищіти усі свої дані\Zn з усіх підключених дисків.\Zn \nВас попередили.\n\nЦя програма виконує лище декілька простих функцій. \nЯкщо вам потрібно щось більше то ви можете зробити це напряму з shell. \n\nВи бажаєте продовжити?'
+    ;;
+    t109)
+        echo 'Оберіть диск для форматування та монтування'
+    ;;
+    t110)
+        echo ' Вихід '
+    ;;
+    t111)
+        echo 'Схоже що диск пустий.\nФорматування та монтування дисків без\nрозділів наразі не підтримується.'
+    ;;
+    t112)
+        echo 'Цей диск вже використовується.\n\nОберіть інший або скасуйте зміни та запустіть програму повторно.'
+    ;;
+    t113)
+        echo "\Z1ПОПЕРЕДЖЕННЯ! Не знайдено розділа '/' \Zn\n\nБез цього розділу встановрення неможливе, програма завершиться з помилкою."
+    ;;
+    t114)
+        echo 'Як використати розділ?\nшифрування / та /boot не підтримується\nцією програмою.'
+    ;;
+    t115)
+        echo 'Відформатувати файлову систему'
+    ;;
+    t116)
+        echo 'використовуйте якщо жодної системи ще не встановлено'
+    ;;
+    t117)
+        echo 'використовуйте коли вже встановлена система'
+    ;;
+    t118)
+        echo 'Вкажіть точку монтування'
+    ;;
+    t119)
+        echo '\nне використовуйте спеціальні символи та @, інакше наслідки будуть непередбачувані.\n Також не використовуйте виду /dir1/dir2... на даний час програмою це не підтримується, та може призвести до помилки встановлення. '
+    ;;
+    t120)
+        echo 'Відформатувати файлову систему'
+    ;;
+    t121)
+        echo 'Вкажіть параметри компресії для btrfs.\n\nКомпресія файлової системи допоможе зберегти простір диска \nта підвищіти реакцію системи \nза рахунок навантаження на процесор. '
+    ;;
+    t122)
+        echo 'за замовчуванням, повільно'
+    ;;
+    t123)
+        echo 'висока компр., дуже повільно'
+    ;;
+    t124)
+        echo 'висока швидкість'
+    ;;
+    t125)
+        echo 'висока компресія'
+    ;;
+    t126)
+        echo 'f2fs надає розширені можливості, але вимагає вказати це при форматуванні.'
+    ;;
+    t127)
+        echo 'підтр. ширування на рівні фс'
+    ;;
+    t128)
+        echo 'extra attr feature'
+    ;;
+    t129)
+        echo 'project ID tracking'
+    ;;
+    t130)
+        echo 'inode checksum'
+    ;;
+    t131)
+        echo 'flexible inline xattr'
+    ;;
+    t132)
+        echo 'квоти'
+    ;;
+    t133)
+        echo 'inode creation time'
+    ;;
+    t134)
+        echo 'контрольна сума суперблока'
+    ;;
+    t135)
+        echo 'casefolding  supp.; opt. flags can be passed with -C'
+    ;;
+    t136)
+        echo 'підтр. компресії на рівні фс'
+    ;;
+    t137)
+        echo 'Форматувати у фс'
+    ;;
+    t138)
+        echo 'Вкажіть параметри компресії для btrfs.\n\nКомпресія файлової системи допоможе зберегти простір диска \nта підвищіти реакцію системи \nза рахунок навантаження на процесор. '
+    ;;
+    t139)
+        echo ' Ні '
+    ;;
+    t140)
+        echo 'Ви можете додати деякі пакунки до пакету встановлення. Ви бажаєте це зробити?'
+    ;;
+    t141)
+        echo 'Це дуже простий, та не дуже стабільний додавач пакунків. Все що він може це додати пакунок до існуючого переліку пакунків. От і все. Пакунки будуть згруповані за тегами pacman-а.'
+    ;;
+    t142)
+        echo '\Z1Помилка додавача пакунків'
+    ;;
+    t143)
+        echo '\nВи зможете встановити додаткові пакунки після встановлення системи.\Zn'
+    ;;
+    t144)
+        echo 'Оберіть repo для пошуку'
+    ;;
+    t145)
+        echo 'Оберіть групу пакунків або скористайтеся пошуком'
+    ;;
+    t146)
+        echo 'Оберіть пакунки'
+    ;;
+    t147)
+        echo 'Пошук'
+    ;;
+    t148)
+        echo '\nЩо щукаємо?\n\n(рекомендується 3 або більше літер)'
+    ;;
+    t149)
+        echo 'Закінчити з додавачем?'
+    ;;
+    t150)
+        echo 'Недоступні пакунки'
+    ;;
+    t151)
+        echo "\n\n\ZbСхоже що перелік пакунків дещо застарів.\nВи можете встановити альтернитиви вручну, або спробувати без них.\Zn"
+    ;;
+    t152)
+        echo 'Вкажіть хост'
+    ;;
+    t153)
+        echo 'Оберіть часовий пояс'
+    ;;
+    t154)
+        echo 'Оберіть локалізації'
+    ;;
+    t155)
+        echo 'Вкажіть логін користувача'
+    ;;
+    t156)
+        echo '\Z1Ця програма не запитує ваш пароль.\n\nВи будете вводити пароль напряму у систему (passwd).\Zn'
+    ;;
+    t157)
+        echo 'Вкажіть пароль користувача:'
+    ;;
+    t158)
+        echo 'Оберіть завдання для виконання'
+    ;;
+    t159)
+        echo 'додати'
+    ;;
+    t160)
+        echo 'до групи'
+    ;;
+    t161)
+        echo ' '
+    ;;
+    t162)
+        echo 'вимкнути dhcpcd, увімкнути networkmanager/wicd'
+    ;;
+    t163)
+        echo 'увімкнути sddm/lxdm'
+    ;;
+    t164)
+        echo 'увімкнути cups, якщо встановлено'
+    ;;
+    t165)
+        echo 'встановити українську мову за замовченням'
+    ;;
+    t166)
+        echo 'додати en uk ru разкладки до xkeyboard'
+    ;;
+    t167)
+        echo 'увімкнути багатопоточну збірку пакунків'
+    ;;
+    t168)
+        echo 'увімкнути mtune=native за замовчуванням'
+    ;;
+    t169)
+        echo 'увімкнути багатопоточну компресію для пакування'
+    ;;
+    t170)
+        echo 'додати zswap до grub '
+    ;;
+    t171)
+        echo 'змінити кольори grub'
+    ;;
+    t172)
+        echo 'додати деякі драйвера до initrd'
+    ;;
+    t173)
+        echo 'змінити гачки ядра'
+    ;;
+    t174)
+        echo 'дозволити кольори для pacman-а'
+    ;;
+    t175)
+        echo 'встановити системний годинник у локльний час'
+    ;;
+    t176)
+        echo 'заборонити /tmp в оперативці'
+    ;;
+    t177)
+        echo 'привязати обробку усіх переривань usb до 1 ядра'
+    ;;
+    t178)
+        echo 'вимкнути root'
+    ;;
+    t179)
+        echo 'вимкнути avahi-daemon.service'
+    ;;
+    t180)
+        echo 'вимкнути lvm2-services'
+    ;;
+    t181)
+        echo 'вимкнути systemd-journald.service'
+    ;;
+    t182)
+        echo 'Оберіть диск для встановлення завантажувача GRUB'
+    ;;
+    t183)
+        echo 'або +/-сектори або +/-розмір{K,M,G,T,P}\n(поточний розмір сектору '
+    ;;
+    t184)
+        echo 'байтів)'
+    ;;
+    t185)
+        echo 'отримання переліку пакунків'
+    ;;
+    t186)
+        echo 'перевірка доступності пакунків'
+    ;;
+    t187)
+        echo 'Далі'
+    ;;
+    t188)
+        echo 'Скасувати'
+    ;;
+    t189)
+        echo 'Оберіть розділ'
+    ;;
+    t190)
+        echo ' Оберіть інший диск, скасувавши зміни' 
+    ;;
+    t191)
+        echo 'Як використати розділ?'
+    ;;
+    t192)
+        echo 'Так'
+    ;;
+    t193)
+        echo 'Ні'
+    ;;
+    t194)
+        echo 'Погоджуюсь'
+    ;;
+    *)
+        echo 'Текст не знайдено'
+    ;;
+esac
+fi
+}
 
 ############################
 ## execute required function
