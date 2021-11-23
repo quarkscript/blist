@@ -633,7 +633,7 @@ for tmp_cycle7 in $(echo "$1" | sed "s/@/ /g" ); do
             tmp_part_path="$tmp_dskpath$(echo $tmp_cycle7 | sed 's/part//g')"
         fi
     elif $(echo $tmp_cycle7 | grep -q zlib )||$(echo $tmp_cycle7 | grep -q zstd ); then
-        tmp_fs_mount_opt=" -o,space_cache,compress=$tmp_cycle7"
+        tmp_fs_mount_opt=" -o,compress=$tmp_cycle7"
     elif $(echo $tmp_cycle7 | grep -q "/" ); then
         if [ "$tmp_cycle7" == "/" ]; then
             tmp_part_label=rootfs
