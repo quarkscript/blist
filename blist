@@ -173,8 +173,14 @@ get_p_str(){
 ## get partitions string
 ## $1 - partition path
 ## $2 - fdisk script commands
-if $(echo -e $2"p\nq" | fdisk "$1" | grep -q "$1[1-9]"); then
-    pn_lst=$(echo -e $2"p\nq" | fdisk "$1" | grep "$1[1-9]" | sed "s@.*$1@@g" | sed "s/ .*//g")
+
+if $(echo $1 | grep -q -e 'mmc' -e 'nvme'); then
+    msk_1="$1""p"
+else
+    msk_1="$1"
+fi
+if $(echo -e $2"p\nq" | fdisk "$1" | grep -q "$msk_1[1-9]"); then
+    pn_lst=$(echo -e $2"p\nq" | fdisk "$1" | grep "$msk_1[1-9]" | sed "s@.*$msk_1@@g" | sed "s/ .*//g")
     ## single partition case
     if [ "$(($(echo $pn_lst | sed 's/ /+/g')))" == "$pn_lst" ]; then
         part_scheme="part$pn_lst "
@@ -371,7 +377,8 @@ while [ ! -z "$tmp_menu_cycle00" ]; do
     #dd if=/dev/zero of=testdik.img bs=10M count=3
     #tmpvar02=testdik.img
     #tmpvar02=$(echo $(ls /dev/disk/by-id | grep -v part | grep -v wwn))
-    tmpvar02=$(echo $(ls /dev | grep -e 'sd' -e 'mmc' | grep -v "[1-9]"))
+    tmpvar02=$(echo $(ls /dev | grep -e 'sd' -e 'vd' | grep -v "[1-9]" | grep -v 'dvd'))
+    tmpvar02+=' '$(echo $(ls /dev | grep -x -e "nvme[0-9]n[0-9]" -e "mmcblk[0-9]"))
     tmpvar01='dialog --no-cancel --radiolist "Select disk to process" "" "" "" '
     tmpvar01+=$(mk_menu_list "$tmpvar02" "on" "1")
     tmpvar01+=' 2>"'"$1"'"'
@@ -737,7 +744,8 @@ while [ ! -z "$tmp_menu_cycle00" ]; do
     else
         #tmpvar02=testdik.img
         #tmpvar02=$(echo $(ls /dev/disk/by-id | grep -v part | grep -v wwn))
-        tmpvar02=$(echo $(ls /dev | grep -e 'sd' -e 'mmc' | grep -v "[1-9]"))
+        tmpvar02=$(echo $(ls /dev | grep -e 'sd' -e 'vd' | grep -v "[1-9]" | grep -v 'dvd'))
+        tmpvar02+=' '$(echo $(ls /dev | grep -x -e "nvme[0-9]n[0-9]" -e "mmcblk[0-9]"))
     fi
     tmpvar01='dialog --no-cancel --radiolist "Select disk to process" "" "" "" '
     tmpvar01+=$(mk_menu_list "$tmpvar02" "on" "1")
@@ -898,10 +906,15 @@ while [ ! -z "$tmp_menu_cycle00" ]; do
     done
 done
 ## find rootfs
+if $(echo $diskpath | grep -q -e 'mmc' -e 'nvme'); then
+    diskpartmask=p
+else
+    diskpartmask=''
+fi
 for tmp_cycle6 in $parts_lst; do
     if $(echo $tmp_cycle6 | grep -q "@/@"); then
         clear
-        ft_n_mt "$tmp_cycle6" "$diskpath"
+        ft_n_mt "$tmp_cycle6" "$diskpath""$diskpartmask"
         tmp_parts_lst=$(echo $parts_lst | sed "s|$tmp_cycle6||g")
     fi
 done
@@ -910,7 +923,7 @@ if $(echo $tmp_parts_lst | grep -q "@/boot@")&&$(echo $tmp_parts_lst | grep -q "
     parts_lst=$tmp_parts_lst
     for tmp_cycle6 in $parts_lst; do
         if $(echo $tmp_cycle6 | grep -q "@/boot@"); then
-            ft_n_mt "$tmp_cycle6" "$diskpath"
+            ft_n_mt "$tmp_cycle6" "$diskpath""$diskpartmask"
             tmp_parts_lst=$(echo $parts_lst | sed "s|$tmp_cycle6 ||g")
         fi
     done
@@ -919,7 +932,7 @@ fi
 tmp_parts_lst_luks=$tmp_parts_lst
 for tmp_cycle6 in $tmp_parts_lst; do
     if $(echo $tmp_cycle6 | grep -vq "luks"); then
-        ft_n_mt "$tmp_cycle6" "$diskpath"
+        ft_n_mt "$tmp_cycle6" "$diskpath""$diskpartmask"
         tmp_parts_lst_luks=$(echo $tmp_parts_lst_luks | sed "s|$tmp_cycle6 ||g")
     fi
 done
@@ -1319,7 +1332,8 @@ else
     echo ''>$1
     #tmpvar02=testdik.img
     #tmpvar02=$(echo $(ls /dev/disk/by-id | grep -v part | grep -v wwn))
-    tmpvar02=$(echo $(ls /dev | grep -e 'sd' -e 'mmc' | grep -v "[1-9]"))
+    tmpvar02=$(echo $(ls /dev | grep -e 'sd' -e 'vd' | grep -v "[1-9]" | grep -v 'dvd'))
+    tmpvar02+=' '$(echo $(ls /dev | grep -x -e "nvme[0-9]n[0-9]" -e "mmcblk[0-9]"))
     tmpvar01='dialog --no-cancel --radiolist "Select disk to install GRUB bootloader" "" "" "" '
     tmpvar01+=$(mk_menu_list "$tmpvar02" "" "")
     tmpvar01+=' 2>"'"$1"'"'
