@@ -1196,7 +1196,9 @@ dialog --nocancel --checklist "$($0 locale t158 $lng)" '' '' '' \
 "24" "$($0 locale t180 $lng)" "" \
 "25" "$($0 locale t181 $lng)" "" \
 "26" "$($0 locale t196 $lng)" "on" \
-"27" "$($0 locale t197 $lng)" "" 2>"$tmpmenuvar256"
+"27" "$($0 locale t197 $lng)" "" \
+"28" "$($0 locale t198 $lng)" "on" \
+"29" "$($0 locale t199 $lng)" "" 2>"$tmpmenuvar256"
 clear
 
 if $(cat "$tmpmenuvar256" | grep -q "01"); then
@@ -1370,6 +1372,13 @@ if $(cat "$tmpmenuvar256" | grep -q "27"); then
     " >>/etc/resolved.conf
     ' >/mnt/st2run
     runchr "$1"
+fi
+if $(cat "$tmpmenuvar256" | grep -q "28")&&[ -f /mnt/etc/default/grub ]; then
+    sed -i 's/loglevel=\?//g' /mnt/etc/default/grub
+    sed -i 's/quiet/quiet loglevel=3 /g' /mnt/etc/default/grub
+fi
+if $(cat "$tmpmenuvar256" | grep -q "29")&&[ -f /mnt/etc/default/grub ]; then
+    sed -i 's/GRUB_CMDLINE_LINUX_DEFAULT="/GRUB_CMDLINE_LINUX_DEFAULT=" audit=0 /g' /mnt/etc/default/grub
 fi
 rm -f $tmpmenuvar256
 echo "LANG=$lng chown -R $user_name /home/$user_name" > /mnt/st2run
@@ -1851,6 +1860,12 @@ case $1 in
     t197)
         echo 'enable system-d DNS cacher'
     ;;
+    t198)
+        echo 'fix silent boot at grub'
+    ;;
+    t199)
+        echo 'disable audit at grub'
+    ;;
     *)
         echo 'String not found'
     ;;
@@ -2300,6 +2315,12 @@ case $1 in
     ;;
     t197)
         echo 'дозволити system-d DNS-кешувальник'
+    ;;
+    t198)
+        echo 'виправити тихе завантаження у grub'
+    ;;
+    t199)
+        echo 'вимкнути audit через налаштування grub'
     ;;
     *)
         echo 'Текст не знайдено'

@@ -1176,7 +1176,9 @@ dialog --nocancel --checklist 'Select tasks to perform' '' '' '' \
 "24" "disable lvm2-services" "" \
 "25" "disable systemd-journald.service" "" \
 "26" "enable pacman parallel downloads" "on" \
-"27" "enable system-d DNS-cache" "" 2>"$tmpmenuvar256"
+"27" "enable system-d DNS-cache" "" \
+"28" "fix silent boot at grub" "on" \
+"29" "disable audit at grub" "" 2>"$tmpmenuvar256"
 clear
 
 if $(cat "$tmpmenuvar256" | grep -q "01"); then
@@ -1350,6 +1352,13 @@ if $(cat "$tmpmenuvar256" | grep -q "27"); then
     " >>/etc/resolved.conf
     ' >/mnt/st2run
     runchr "$1"
+fi
+if $(cat "$tmpmenuvar256" | grep -q "28")&&[ -f /mnt/etc/default/grub ]; then
+    sed -i 's/loglevel=\?//g' /mnt/etc/default/grub
+    sed -i 's/quiet/quiet loglevel=3 /g' /mnt/etc/default/grub
+fi
+if $(cat "$tmpmenuvar256" | grep -q "29")&&[ -f /mnt/etc/default/grub ]; then
+    sed -i 's/GRUB_CMDLINE_LINUX_DEFAULT="/GRUB_CMDLINE_LINUX_DEFAULT=" audit=0 /g' /mnt/etc/default/grub
 fi
 rm -f $tmpmenuvar256
 echo "chown -R $user_name /home/$user_name" > /mnt/st2run
