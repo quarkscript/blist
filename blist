@@ -3,10 +3,27 @@
 ## checking of missing dialog
 if [ -z $1 ]; then
     if $(dialog 2>&1 | grep -q "command not found"); then
-    echo '
+        echo '
 It looks like the "dialog" is not available. This script will not work without it.
 Lets try to install it:
-'; sleep 2; pacman -Sy; pacman -S dialog --noconfirm --needed; fi
+'
+        pacman -Sy
+        #pacman-key --init
+        #pacman-key --populate archlinux
+        #pacman -S archlinux-keyring --noconfirm --needed
+        pacman -S dialog --noconfirm --needed
+    fi
+    if $(dialog 2>&1 | grep -q "command not found"); then
+        echo -e '\nProbable a pacman signature keys outdated or fail.\nLets make trust all and reinstall dialog and archlinux-keyring\n'
+        rm -f /var/cache/pacman/pkg/*.sig
+        sed -i 's/ Required DatabaseOptional/ TrustAll/g' /etc/pacman.conf
+        pacman -Sy
+        pacman-key --init
+        pacman-key --populate archlinux
+        pacman -S archlinux-keyring --noconfirm --needed
+        pacman -S dialog --noconfirm --needed
+        #pacman -U /var/cache/pacman/pkg/dialog*zst --noconfirm --needed
+    fi
     if $(dialog 2>&1 | grep -q "command not found"); then
     echo '
 Seems it did not work. Sorry.
@@ -14,16 +31,42 @@ Seems it did not work. Sorry.
 fi
 
 batchlist='packages.txt'
+
+## ---------------------- ##
+## internal function      ##
+## ---------------------- ##
+
+mnt_chk(){
+    ## $1 - exit status
+    if ! $(mount | grep -q "/mnt"); then dialog --title 'Error' --colors --msgbox "\n\Z1Nothing mounted to /mnt. Installation aborted.\n\n\ZnRoot partition should be mounted to /mnt firstly" '' ''; echo 8  >$1; fi
+}
+
+## ---------------------- ##
+## next internal function ##
+## ---------------------- ##
+
+bash_chk(){
+    ## $1 - exit status
+    if [ ! -f "/mnt/usr/bin/bash" ]; then dialog --title 'Error' --colors --msgbox "\n\Z1Looks like sys is not installed on /mnt\n\n\ZnYou need to install system firstly" '' ''; echo 10  >$1; fi
+}
+
+## ---------------------- ##
+## main script            ##
+## ---------------------- ##
+
 if [ -z "$1" ]; then
     exitstatus=$(mktemp XXXXXXXX.tmp)
-    dialog --defaultno --colors --yes-label "Accept the risks" --no-label "Do NOT accept" --title "Disclaimer." --yesno '\n\Z1\ZrBy using this script you must accept potential risks of loss all your data.\n\nThe better way to save your data is to make backups to external storages.\n\nThere are no any guarantees. That means script provided As Is\Zn' '' ''
-    if [ $? -ne 0 ]; then clear; rm -f $exitstatus ; exit 0; fi
     pacman 2&>$exitstatus
     if $(cat $exitstatus | grep -q 'command not found'); then 
-        dialog --colors --ok-label "  Got it  " --msgbox "\Z1\Zrnon official\Zn Arch Linux batch-list installation script tool. \Z3https://[github,gitlab].com/quarkscript\Zn\nCreator Andrew S.\nLicense GPL\n\nIt seems \n- this is not an Arch Linux or at least pacman did not installed.\n\nYou may try fdisk_gui, but without root privileges it will fail." '' '' #"$(($(tput lines)-10))" "$(($(tput cols)-10))"
-        clear; $0 fdisk_gui "$exitstatus"; rm -f $exitstatus; clear; exit 0 ; fi
-        #clear; rm -f $exitstatus; echo 3; exit 0 ; fi
-    dialog --colors --radiolist "\Z1\Zrnon official\Zn Arch Linux batch-list installation script tool. \Z3https://[github,gitlab].com/quarkscript\Zn\nCreator Andrew S.\nLicense GPL\n\nWhat do you want to do?   (Use space button to select item)" '' '' '' 'Make' 'packages list from runned arch linux system' '' 'Install' 'due to batch list' '' 'MakeArm' 'images (in development)' '' 2>$exitstatus
+        dialog --colors --ok-label "  Got it  " --msgbox "\Z1\Zr non official \Zn Arch Linux batch-list installation script tool. \nWritten from scratch on bash and dialog.\nCreator Andrew S. \Z3https://git[hu,la]b.com/quarkscript\Zn\nLicense GPL\n\nIt seems \n- this is not an Arch Linux or at least pacman did not installed.\n\nSome functions of script will fail." '' '' 
+        #clear; rm -f $exitstatus; exit 0 ; 
+    fi
+    
+    dialog --defaultno --colors --yes-label "Accept the risks" --no-label "Do NOT accept" --title "Disclaimer." --yesno '\n\Z1By using this script you must accept potential risks of loss all your data.\n\nThe better way to save your data is to make backups to external storages.\n\nThere are no any guarantees. Script provided As Is\Zn' '' ''
+    
+    if [ $? -ne 0 ]; then clear; rm -f $exitstatus ; exit 0; fi
+    
+    dialog --colors --radiolist "\Z1\Zrnon official\Zn Arch Linux batch-list installation script tool. Written from scratch on bash and dialog.\nCreator Andrew S. \Z3https://git[hu,la]b.com/quarkscript\Zn\nLicense GPL\n\nWhat do you want to do?   (Use space button to select item)" '' '' '' 'Make' 'packages list from runned arch linux system' '' 'Install' 'due to batch list' ''  2>$exitstatus
 
     if [ -z $(cat $exitstatus) ]; then clear; rm -f $exitstatus; exit 0 ; fi # when cancel pressed
 
@@ -36,48 +79,221 @@ if [ -z "$1" ]; then
     elif [ "$(cat $exitstatus)" == "Install" ]; then
         pacstrap 2&>$exitstatus
         if $(cat $exitstatus | grep -q 'command not found'); then
-            dialog --msgbox 'It seems like you are tries to install\n a new OS from existed Arch Linux.\nTo do that you need install\n "arch-install-scripts" before.\nAnd run this again with root privileges' '' ''
+            dialog --msgbox '"arch-install-scripts" not found.\nInstallation aborted' '' ''
             rm -f $exitstatus
             exit 0
         fi
-        clear
-        if [ ! -s "$batchlist" ]; then rm -f $batchlist; $0 "mk_batch_list" "$exitstatus" "$batchlist" "t"; fi
-        $0 "mk_batch_list" "$exitstatus" "$batchlist" "e"
-        
-        dialog --defaultno --yesno "You can let the installer download packages in parallel. Sometimes this can speed up the installation process, sometimes not.\n\nDo you want to download packages in parallel?" '' ''
-        if [ $? -eq 0 ]; then sed -i 's/#Parallel/Parallel/g' /etc/pacman.conf; fi
-        
-        $0 fdisk_gui "$exitstatus"
-        
-        $0 disk_fnm "$exitstatus"
-        
-        if ! $(mount | grep -q "/mnt"); then dialog --title 'Error' --colors --msgbox "\Z1Nothing mounted to /mnt. Installation fail.\n\n\ZnYou need to select a partition for '/' on 'Simple disk formatter and mounter' menu or mount the future root partition to /mnt manually before executing $0" '' ''; rm -f $exitstatus; exit 0; fi
         
         clear
-        $0 step1 "$exitstatus"
+        mmi_1=' Execute next installation step\n(some steps dropped by default)'
+        mmi_2='choose packages template'
+        mmi_3='test packages availability'
+        mmi_4='remove packages from list'
+        mmi_5=' _ add packages to list'
+        mmi_6='Disk partitioning (fdisk)'
+        mmi_7=' _ SOFTRAID'
+        mmi_8=' _ LVM'
+        mmi_9=' _ LUKS'
+        mmi_10='Format and mount to /mnt'
+        mmi_11=' _ partitionless btrfs disk'
+        mmi_12='Install system and packages'
+        mmi_13='hostname / timezone / locale'
+        mmi_14='users / passwords'
+        mmi_15='tune system'
+        mmi_16=' _ execute a bash'
+        mmi_17=' _ exit without reboot'
+        mmi_18='Reboot'
         
-        tmp_mscrname=$(echo $0 | sed 's|\.||g' | sed 's|\/||g')
-        if [ -f "$tmp_mscrname" ]; then cp -f $tmp_mscrname /mnt/$tmp_mscrname
-        else
-            cp -f $(find / $tmp_mscrname | grep $tmp_mscrname -m 1) /mnt/$tmp_mscrname
-        fi
-        chmod +x /mnt/$tmp_mscrname
-        
-        echo '' > $exitstatus
-        echo '' > /mnt/$exitstatus
-        #echo -e "\n./$tmp_mscrname 'step2' '$exitstatus'" | arch-chroot /mnt
-        $0 step2 "$exitstatus"
+        stepsvar=1
+        while [ "$stepsvar" -gt 0 ]; do
+            
+#             t="dialog --nocancel --radiolist '$mmi_1' '' '' '' 
+#             '$mmi_2' '' '@1@' 
+#             '$mmi_3' '' '@2@' 
+#             '$mmi_4' '' '@3@' 
+#             '$mmi_5' '' '@4@' 
+#             '$mmi_6' '' '@5@' 
+#             '$mmi_7' '' '@6@' 
+#             '$mmi_8' '' '@7@' 
+#             '$mmi_9' '' '@8@' 
+#             '$mmi_10' '' '@9@' 
+#             '$mmi_11' '' '@10@' 
+#             '$mmi_12' '' '@11@' 
+#             '$mmi_13' '' '@12@' 
+#             '$mmi_14' '' '@13@' 
+#             '$mmi_15' '' '@14@' 
+#             '$mmi_16' '' '@15@' 
+#             '$mmi_17' '' '@16@' 
+#             '$mmi_18' '' '@17@' 
+#             2>$exitstatus"
+
+            t="dialog --nocancel --radiolist '$mmi_1' '' '' '' 
+            '$mmi_2' '' '@1@' 
+            '$mmi_3' '' '@2@' 
+            '$mmi_4' '' '@3@' 
+            '$mmi_5' '' '@4@' 
+            '$mmi_6' '' '@5@' 
+            '$mmi_7' '' '@6@' 
+            '$mmi_8' '' '@7@' 
+            '$mmi_9' '' '@8@' 
+            '$mmi_10' '' '@9@' 
+            '$mmi_11' '' '@10@' 
+            '$mmi_12' '' '@11@' 
+            '$mmi_13' '' '@12@' 
+            '$mmi_14' '' '@13@' 
+            '$mmi_15' '' '@14@' 
+            '$mmi_17' '' '@16@' 
+            '$mmi_18' '' '@17@' 
+            2>$exitstatus"
+            
+            eval $(echo $t | sed "s/@$stepsvar@/on/g" | sed 's/@[1-9]@//g' | sed 's/@[1-9][0-9]@//g' )
+            
+            if $(cat "$exitstatus" | grep -q "$mmi_2"); then
+                if [ -f "$batchlist" ]; then
+                    dialog --defaultno --yesno "$batchlist existed. Do You wish to owerwrite it?" '' ''
+                    if [ $? -eq 0 ]; then rm -f $batchlist; fi
+                fi
+                if [ ! -s "$batchlist" ]; then rm -f $batchlist; $0 "mk_batch_list" "$exitstatus" "$batchlist" "t"; fi
+                stepsvar=1
+            elif $(cat "$exitstatus" | grep -q "$mmi_3"); then
+                $0 "chk_pk_avl" "$exitstatus"
+                stepsvar=2
+            elif $(cat "$exitstatus" | grep -q "$mmi_4"); then
+                $0 "mk_batch_list" "$exitstatus" "$batchlist" "e"
+                stepsvar=4
+            elif $(cat "$exitstatus" | grep -q "$mmi_5"); then
+                dialog --defaultno --yesno "Simply adding the package to the install list.\n\nThis action is not recommended. It may be slow or unstable. It has been included to add a package required to boot your system. Most other packages can simply be installed on an already running system.\n\nContinue?" '' ''
+                if [ $? -eq 0 ]; then 
+                    $0 "simple_pkg_add" "$exitstatus"
+                fi
+                stepsvar=4
+            elif $(cat "$exitstatus" | grep -q "$mmi_6"); then
+                $0 "pp" "$exitstatus"
+                stepsvar=8
+            elif $(cat "$exitstatus" | grep -q "$mmi_7"); then
+                dialog --defaultno --yesno "Add soft RAID sheme to block devices list.\n\nThis action is not recommended. The following dialogs contains only some basic options.\n\nContinue?" '' ''
+                if [ $? -eq 0 ]; then
+                    dialog --title 'Warning' --msgbox "It is not implemented yet" '5' '31'
+                fi
+                stepsvar=8
+            elif $(cat "$exitstatus" | grep -q "$mmi_8"); then
+                dialog --defaultno --yesno "Add LVM sheme to block devices list.\n\nThis action is not recommended. The following dialogs contains only some basic options.\n\nContinue?" '' ''
+                if [ $? -eq 0 ]; then
+                    dialog --title 'Warning' --msgbox "It is not implemented yet" '5' '31'
+                fi
+                stepsvar=8
+            elif $(cat "$exitstatus" | grep -q "$mmi_9"); then
+                dialog --defaultno --yesno "Encrypt partitions by LUKS.\n\nThis action is not recommended. The following dialogs contains only some basic options.\n\nContinue?" '' ''
+                if [ $? -eq 0 ]; then
+                    dialog --title 'Warning' --msgbox "It is not implemented yet" '5' '31'
+                fi
+                stepsvar=8
+            elif $(cat "$exitstatus" | grep -q "$mmi_10"); then
+                $0 disk_fnm "$exitstatus"
+                cp -f install.log /mnt/install.log
+                stepsvar=10
+            elif $(cat "$exitstatus" | grep -q "$mmi_11"); then
+                #$0 disk_fnm "$exitstatus"
+                dialog --defaultno --yesno "Format entire drive as btrfs without partitions.\n\nThis action is not recommended. For use this scheme on UEFI system, you would need an additional ESP partition on another drive. The following dialog contains only some basic options.\n\nContinue?" '' ''
+                if [ $? -eq 0 ]; then 
+                    $0 "plbtrfs" "$exitstatus"
+                    cp -f install.log /mnt/install.log
+                fi
+                stepsvar=10
+            elif $(cat "$exitstatus" | grep -q "$mmi_12"); then
+                echo ''>"$exitstatus"
+                mnt_chk "$exitstatus"
+                if $(cat "$exitstatus" | grep -q [0-9]); then
+                    stepsvar=$(echo $(cat "$exitstatus"))
+                else
+                    dialog --defaultno --yesno "You can let the installer download packages in parallel. Sometimes this can speed up the installation process, sometimes not.\n\nDo you want to download packages in parallel?" '' ''
+                    if [ $? -eq 0 ]; then sed -i 's/#Parallel/Parallel/g' /etc/pacman.conf; fi
+                    cp -f "$(echo "$0" | sed 's/\.\///g')" /mnt/$(echo "$0" | sed 's/\.\///g')
+                    cp -f "$exitstatus" "/mnt/$exitstatus"
+                    $0 "install_pk" "$exitstatus" |& tee -a /mnt/install.log
+                    if $(cat /mnt/install.log | grep -q 'is marginal trust'); then
+                        echo -e "\ndetected installation error\nlooks like installation media has outdated gpg keys\nupdate keys and rerun installation\n" |& tee -a /mnt/install.log
+                        pacman-key --init |& tee -a /mnt/install.log
+                        pacman-key --populate archlinux |& tee -a /mnt/install.log
+                        pacman -S archlinux-keyring --noconfirm --needed |& tee -a /mnt/install.log
+                        $0 "install_pk" "$exitstatus" |& tee -a /mnt/install.log
+                    fi
+                    stepsvar=11
+                fi
+            elif $(cat "$exitstatus" | grep -q "$mmi_13"); then
+                echo ''>"$exitstatus"
+                mnt_chk "$exitstatus"
+                if $(cat "$exitstatus" | grep -q [0-9]); then
+                    stepsvar=$(echo $(cat "$exitstatus"))
+                else
+                    echo ''>"$exitstatus"
+                    bash_chk "$exitstatus"
+                    if $(cat "$exitstatus" | grep -q [0-9]); then
+                        stepsvar=$(echo $(cat "$exitstatus"))
+                    else
+                        $0 "set_hlt" "$exitstatus"
+                        stepsvar=12
+                    fi
+                fi
+            elif $(cat "$exitstatus" | grep -q "$mmi_14"); then
+                echo ''>"$exitstatus"
+                mnt_chk "$exitstatus"
+                if $(cat "$exitstatus" | grep -q [0-9]); then
+                    stepsvar=$(echo $(cat "$exitstatus"))
+                else
+                    echo ''>"$exitstatus"
+                    bash_chk "$exitstatus"
+                    if $(cat "$exitstatus" | grep -q [0-9]); then
+                        stepsvar=$(echo $(cat "$exitstatus"))
+                    else
+                        $0 "set_users" "$exitstatus"
+                        stepsvar=13
+                    fi
+                fi
+            elif $(cat "$exitstatus" | grep -q "$mmi_15"); then
+                echo ''>"$exitstatus"
+                mnt_chk "$exitstatus"
+                if $(cat "$exitstatus" | grep -q [0-9]); then
+                    stepsvar=$(echo $(cat "$exitstatus"))
+                else
+                    echo ''>"$exitstatus"
+                    bash_chk "$exitstatus"
+                    if $(cat "$exitstatus" | grep -q [0-9]); then
+                        stepsvar=$(echo $(cat "$exitstatus"))
+                    else
+                        $0 "fin_tune" "$exitstatus"
+                        stepsvar=16
+                    fi
+                fi
+            elif $(cat "$exitstatus" | grep -q "$mmi_16"); then
+                clear
+                echo "#" Bash shell. To exit use "'"exit"'" command.
+                echo "#" Root partition should be mounted to /mnt
+                echo "#" to chroot there use "'"arch-chroot /mnt"'" command.
+                echo "#" Any unavailable app could be installed by pacman
+                echo ''
+                bash
+                stepsvar=16
+            elif $(cat "$exitstatus" | grep -q "$mmi_17"); then
+                stepsvar=17
+                rm -f $exitstatus
+                rm -f /mnt/$exitstatus
+                rm -f /mnt/st2run
+            elif $(cat "$exitstatus" | grep -q "$mmi_18"); then
+                stepsvar=17
+                rm -f $exitstatus
+                rm -f /mnt/$exitstatus
+                rm -f /mnt/st2run
+                reboot
+            fi
+            stepsvar=$(($stepsvar+1))
+            if [ "$stepsvar" -gt 17 ]; then stepsvar=0; fi
+        done
+
         rm -f /mnt/$exitstatus
         rm -f /mnt/st2run
         rm -f $exitstatus
         sync
-        dialog --yes-label ' Reboot ' --yesno "Now you can reboot and try the new system.\n\nWhen all is good, you will get a bootable and functional OS. Otherwise there might not be enough free space or something failed." '' ''
-        if [ $? -eq 0 ]; then reboot; fi
-        
-    elif [ "$(cat $exitstatus)" == "MakeArm" ]; then
-        clear
-        echo 'MakeArm images possible development in future'
-        #$0 step3 "$exitstatus"
         
     fi
     rm -f $exitstatus
@@ -89,20 +305,20 @@ fi
 ## ----------------- ##
 
 mk_menu_list(){
-## $1 - menuitem
-## $2 - menu 3rd param
-## $3 when nonzero -first only 3rd param
-rez=''
-for jj in $1; do
-    if [ -z $3 ]; then
-        rez+='"'"$jj"'" "" "'"$2"'" '
-    elif [ ! -z $3 ]&&[ "$rez" != "" ]; then
-        rez+='"'"$(echo $jj)"'" "" "'""'" '
-    else
-        rez+='"'"$(echo $jj)"'" "" "'"$2"'" '
-    fi
-done
-echo $rez
+    ## $1 - menuitem
+    ## $2 - menu 3rd param
+    ## $3 when nonzero -first only 3rd param
+    rez=''
+    for jj in $1; do
+        if [ -z $3 ]; then
+            rez+='"'"$jj"'" "" "'"$2"'" '
+        elif [ ! -z $3 ]&&[ "$rez" != "" ]; then
+            rez+='"'"$(echo $jj)"'" "" "'""'" '
+        else
+            rez+='"'"$(echo $jj)"'" "" "'"$2"'" '
+        fi
+    done
+    echo $rez
 }
 
 ## ---------------------- ##
@@ -110,47 +326,41 @@ echo $rez
 ## ---------------------- ##
 
 mk_batch_list(){
-## $1 - exitstatus
-## $2 - batchlist
-## $3 : g - get from runned system; t - get from template; e - edit it
-if [ "$3" == "g" ]; then
-    echo '0'>$1
-    if [ -f "$2" ]; then
-        dialog --yesno "$2 is already existed, owerwrite it?" '' ''
-        echo $? >$1
+    ## $1 - exitstatus
+    ## $2 - batchlist
+    ## $3 : g - get from runned system; t - get from template; e - edit it
+    if [ "$3" == "g" ]; then
+        echo '0'>$1
+        if [ -f "$2" ]; then
+            dialog --yesno "$2 is already existed, owerwrite it?" '' ''
+            echo $? >$1
+        fi
+        if [ "$(cat $1)" != 1 ]; then pacman -Qqe >$2; fi
+    elif [ "$3" == "t" ]; then
+        echo 0 >$1
+        if [ -f "$2" ]; then
+            dialog --yesno "$2 is already existed, owerwrite it?" '' ''
+            echo $? >$1
+        fi
+        if [ "$(cat $1)" != 1 ]; then
+            mk_bl_var1='dialog  --no-cancel --ok-label agree --radiolist "Warning! '"'$2'"' does not found A new '"'$2'"' will be created from template. Wich template do you want to use?" "" "" "" '" $(echo $(cat $0 | grep pkgtmpl | grep -v '$0' | sed 's/.*pkgtmpl: / "/g' | sed 's/ @ /" "/g' | sed 's/ @@.*/" "" /g')) "'2>$1'
+            eval $mk_bl_var1
+            
+            mk_bl_var2=$(cat "$1")
+            if [ -z $mk_bl_var2 ]; then mk_bl_var2='plasma'; fi
+            echo $(cat $0 | grep pkgtmpl | grep -v '$0' | grep "$mk_bl_var2" | sed 's/.* @@//g')>"$2"
+        fi
+    elif [ "$3" == "e" ]; then
+        
+        dlg='dialog --no-cancel --ok-label agree --checklist "The packagelist. Do you wish to exclude something from there? just deselect it." "" "" "" '
+        for jj in $(echo $(cat $2)); do
+            dlg+='"'"$jj"'" "" on '
+        done
+        dlg+=' 2''>'"$1"
+        eval $dlg
+        cat $1>$2
+        return 0
     fi
-    if [ "$(cat $1)" != 1 ]; then pacman -Qqe >$2; fi
-elif [ "$3" == "t" ]; then
-    echo 0 >$1
-    if [ -f "$2" ]; then
-        dialog --yesno "$2 is already existed, owerwrite it?" '' ''
-        echo $? >$1
-    fi
-    if [ "$(cat $1)" != 1 ]; then
-        dialog  --no-cancel --ok-label agree --radiolist "Warning! '$2' does not found A new '$2' will be created from template. Wich template do you want to use?" '' '' '' 'plasma' '- plasma desktop + libreoffice + firefox...' on 'xfce' '- xfce desktop + firefox...' '' 'lxqt' '- slim lxqt desktop only' '' 'xfce_dt' '- xfce + fs/disks utils' '' 'ARM_303_xfce' '- xfce desktop for ARMv7hf xe303c12 chromebook' '' 2>$1
-            if [ "$(cat $1)" == "plasma" ]; then
-                echo "acpi acpid alsa-utils ark mkinitcpio discover audacity autoconf automake avidemux-qt bash binutils bison bluedevil bluez-cups bluez-hid2hci bluez-utils botan btrfs-progs bzip2 cdrdao cmake conky coreutils crda cryptsetup cups cups-pdf device-mapper dhcpcd dialog diffutils dolphin dosfstools dvd+rw-tools e2fsprogs ecryptfs-utils ed f2fs-tools faac fakeroot file filesystem findutils firefox firefox-i18n-ru firefox-i18n-uk flex foomatic-db-engine gawk gcc gcc-libs gettext gimp git glibc gparted grep grub gsmartcontrol gst-libav gst-plugins-good gst-plugins-ugly gstreamer-vaapi gwenview gzip hidapi imake inetutils iproute2 iputils iw k3b kate kcalc kdegraphics-mobipocket kdenetwork-filesharing kimageformats konsole krita kscreen kwalletmanager ladspa less libmirage libreoffice-fresh libreoffice-fresh-ru libreoffice-fresh-uk libtool libva-vdpau-driver libvdpau-va-gl licenses linux linux-headers logrotate lvm2 m4 make man-db man-pages mc mdadm mediainfo mkvtoolnix-gui nano netctl networkmanager networkmanager-openvpn networkmanager-qt noto-fonts-cjk noto-fonts-emoji ntfs-3g nvidia-dkms nvidia-settings ocl-icd okular opencl-headers opencl-nvidia os-prober p7zip packagekit-qt5 pacman patch pciutils perl pigz plasma-desktop plasma-nm plasma-pa powerdevil procps-ng psmisc psutils pulseaudio-alsa pulseaudio-bluetooth qt5-connectivity qt5-imageformats qt5-serialport qt5-virtualkeyboard ragel rcs samba sddm sddm-kcm sed shadow sudo sysfsutils systemd-sysvcompat tar texinfo thunderbird thunderbird-i18n-ru thunderbird-i18n-uk transcode transmission-qt ufw uget unrar unzip usbutils user-manager util-linux vcdimager vi vlc wget which wireless-regdb xf86-input-evdev xf86-input-libinput xf86-input-synaptics xf86-input-vmmouse xf86-input-void xf86-video-ati xf86-video-dummy xf86-video-fbdev xf86-video-vesa xf86-video-amdgpu xf86-video-ati xf86-video-intel xf86-video-nouveau xmlto xorg-bdftopcf xorg-docs xorg-font-util xorg-fonts-100dpi xorg-fonts-75dpi xorg-fonts-cyrillic xorg-fonts-encodings xorg-iceauth xorg-mkfontscale xorg-server xorg-server-common xorg-server-devel xorg-server-xephyr xorg-server-xnest xorg-server-xvfb xorg-server-xwayland xorg-sessreg xorg-setxkbmap xorg-smproxy xorg-x11perf xorg-xauth xorg-xbacklight xorg-xcmsdb xorg-xcursorgen xorg-xdpyinfo xorg-xdriinfo xorg-xev xorg-xgamma xorg-xhost xorg-xinput xorg-xkbcomp xorg-xkbevd xorg-xkbutils xorg-xkill xorg-xlsatoms xorg-xlsclients xorg-xmodmap xorg-xpr xorg-xprop xorg-xrandr xorg-xrdb xorg-xrefresh xorg-xset xorg-xsetroot xorg-xvinfo xorg-xwd xorg-xwininfo xorg-xwud xsane xsane-gimp yasm zip">$2
-             elif [ "$(cat $1)" == "xfce" ]; then
-                echo "base bluez btrfs-progs crda dhcpcd dialog diffutils f2fs-tools ffmpeg firefox gimp gparted grub gvfs gvfs-afc gvfs-gphoto2 gvfs-mtp gvfs-smb htop inetutils linux logrotate lvm2 lxdm man-db man-pages mc mdadm mkinitcpio mousepad mpv nano netctl network-manager-applet networkmanager nm-connection-editor os-prober p7zip pavucontrol pulseaudio-alsa samba sudo texinfo thunar thunar-archive-plugin thunar-volman unrar vi which xf86-input-evdev xf86-input-libinput xf86-input-synaptics xf86-input-void xf86-input-wacom xf86-video-amdgpu xf86-video-ati xf86-video-fbdev xf86-video-intel xf86-video-nouveau xf86-video-vesa xfce4-appfinder xfce4-artwork xfce4-battery-plugin xfce4-clipman-plugin xfce4-cpufreq-plugin xfce4-cpugraph-plugin xfce4-datetime-plugin xfce4-fsguard-plugin xfce4-genmon-plugin xfce4-mount-plugin xfce4-netload-plugin xfce4-notifyd xfce4-panel xfce4-power-manager xfce4-pulseaudio-plugin xfce4-screenshooter xfce4-sensors-plugin xfce4-session xfce4-settings xfce4-systemload-plugin xfce4-taskmanager xfce4-terminal xfce4-time-out-plugin xfce4-timer-plugin xfce4-verve-plugin xfce4-wavelan-plugin xfce4-whiskermenu-plugin xfce4-xkb-plugin xfdesktop xfwm4 xfwm4-themes xorg-fonts-100dpi xorg-fonts-75dpi xorg-iceauth xorg-server xorg-sessreg xorg-setxkbmap xorg-smproxy xorg-xauth xorg-xbacklight xorg-xcmsdb xorg-xcursorgen xorg-xdpyinfo xorg-xdriinfo xorg-xev xorg-xgamma xorg-xinput xorg-xkbevd xorg-xkbutils xorg-xkill xorg-xlsatoms xorg-xlsclients xorg-xmodmap xorg-xpr xorg-xprop xorg-xrandr xorg-xrdb xorg-xrefresh xorg-xset xorg-xsetroot xorg-xvinfo xorg-xwd xorg-xwininfo xorg-xwud zip ">$2
-            elif [ "$(cat $1)" == "lxqt" ]; then
-                echo "acpi acpid alsa-firmware alsa-utils b43-fwcutter base btrfs-progs cifs-utils crda dhclient dhcpcd dialog diffutils dmraid ecryptfs-utils f2fs-tools grub haveged inetutils liblxqt linux linux-firmware linux-headers logrotate lximage-qt lxqt-about lxqt-admin lxqt-archiver lxqt-config lxqt-globalkeys lxqt-notificationd lxqt-openssh-askpass lxqt-panel lxqt-policykit lxqt-powermanagement lxqt-qtplugin lxqt-runner lxqt-session lxqt-sudo lxqt-themes man-db man-pages mdadm mkinitcpio nano net-tools network-manager-applet networkmanager-qt nm-connection-editor ntfs-3g obconf-qt openbox openssh os-prober pcmanfm-qt powertop pulseaudio-alsa reflector rsync s-nail screengrab sddm sudo sysfsutils syslog-ng texinfo usbutils which wpa_supplicant xdg-user-dirs xdg-utils xf86-input-vmmouse xf86-video-amdgpu xf86-video-ati xf86-video-dummy xf86-video-fbdev xf86-video-intel xf86-video-nouveau xf86-video-openchrome xf86-video-sisusb xf86-video-vesa xf86-video-vmware xf86-video-voodoo xorg-iceauth xorg-server xorg-sessreg xorg-setxkbmap xorg-smproxy xorg-xauth xorg-xbacklight xorg-xcmsdb xorg-xcursorgen xorg-xdpyinfo xorg-xdriinfo xorg-xev xorg-xgamma xorg-xinit xorg-xinput xorg-xkbevd xorg-xkbutils xorg-xkill xorg-xlsatoms xorg-xlsclients xorg-xmodmap xorg-xpr xorg-xprop xorg-xrandr xorg-xrdb xorg-xrefresh xorg-xset xorg-xsetroot xorg-xvinfo xorg-xwd xorg-xwininfo xorg-xwud xterm zip ">$2
-            elif [ "$(cat $1)" == "xfce_dt" ]; then
-                echo "afpfs-ng avfs base bleachbit bluez bonnie++ btfs btrfs-progs cabextract cdrtools cgmanager chntpw cifs-utils clonezilla compsize crda cryfs curlftpfs cyrus-sasl dash davfs2 ddrescue dhcpcd dialog diffutils dmapi dmg2img dracut dstat duperemove ecryptfs-utils efibootmgr elfutils emelfm2 encfs ethtool evince exfat-utils expect extundelete f2fs-tools fatresize ffmpeg file-roller firefox foremost freerdp fsarchiver fscrypt fuse-overlayfs galculator gcr gd glusterfs gnome-disk-utility gocryptfs gpart gparted gphoto2 grsync grub grub-customizer guvcview hardinfo hddtemp hexchat hexedit htop idle3-tools inetutils iperf iperf3 jfsutils kbfs lastpass-cli leafpad lftp libbsd libcaca libewf libgtop libieee1284 libisoburn libisofs libldm libmbim libmng libndp libplist libqmi libusbmuxd linux logrotate lshw lsscsi lvm2 lxcfs lxdm man-db man-pages mate-utils mbedtls mc mdadm memtester mhash minicom mkinitcpio mousepad mpv mtools mtpfs multipath-tools nano nbd ncdu ncftp ncompress net-tools netctl netpbm network-manager-applet networkmanager networkmanager-pptp nfs-utils nm-connection-editor nmap notification-daemon ntp nvme-cli openvpn os-prober p7zip parallel pavucontrol pcmanfm-gtk3 poppler-data powertop psensor pth pulseaudio-alsa putty pv rdesktop rdiff-backup read-edid remmina reptyr rp-pppoe s3fs-fuse samba sane sbc scite shake sleuthkit smartmontools smbnetfs snapper squashfs-tools squashfuse stress sudo syslinux taglib tcplay testdisk texinfo thunar thunar-archive-plugin thunar-volman tigervnc tk tmux tree truecrypt udevil unrar veracrypt vi which wimlib wipe x11vnc xdialog xf86-input-evdev xf86-input-libinput xf86-input-synaptics xf86-input-void xf86-input-wacom xf86-video-amdgpu xf86-video-ati xf86-video-fbdev xf86-video-intel xf86-video-nouveau xf86-video-vesa xfburn xfce4-appfinder xfce4-artwork xfce4-battery-plugin xfce4-clipman-plugin xfce4-cpufreq-plugin xfce4-cpugraph-plugin xfce4-datetime-plugin xfce4-fsguard-plugin xfce4-genmon-plugin xfce4-mount-plugin xfce4-netload-plugin xfce4-notifyd xfce4-panel xfce4-power-manager xfce4-pulseaudio-plugin xfce4-screenshooter xfce4-sensors-plugin xfce4-session xfce4-settings xfce4-systemload-plugin xfce4-taskmanager xfce4-terminal xfce4-time-out-plugin xfce4-timer-plugin xfce4-verve-plugin xfce4-wavelan-plugin xfce4-whiskermenu-plugin xfce4-xkb-plugin xfdesktop xfsdump xfwm4 xfwm4-themes xorg-fonts-100dpi xorg-fonts-75dpi xorg-iceauth xorg-server xorg-sessreg xorg-setxkbmap xorg-smproxy xorg-xauth xorg-xbacklight xorg-xcmsdb xorg-xcursorgen xorg-xdpyinfo xorg-xdriinfo xorg-xev xorg-xgamma xorg-xinput xorg-xkbevd xorg-xkbutils xorg-xkill xorg-xlsatoms xorg-xlsclients xorg-xmodmap xorg-xpr xorg-xprop xorg-xrandr xorg-xrdb xorg-xrefresh xorg-xset xorg-xsetroot xorg-xvinfo xorg-xwd xorg-xwininfo xorg-xwud yad zip zsync">$2
-            elif [ "$(cat $1)" == "ARM_303_xfce" ]; then
-                echo "alsa-firmware alsa-plugins alsa-tools alsa-utils audacity bash bluez btrfs-progs bzip2 coreutils crda cryptsetup device-mapper dhcpcd dialog diffutils ffmpeg file filesystem findutils firefox gawk gcc gcc-libs gettext gimp glibc gparted grep gtk-xfce-engine gvfs gvfs-afc gvfs-gphoto2 gvfs-mtp gvfs-smb gzip htop inetutils iproute2 iputils less libreoffice-fresh libva-mesa-driver licenses linux-armv7-chromebook logrotate lvm2 lxdm make man-db man-pages mc mdadm mesa-demos mesa-vdpau mousepad mpv mtools nano netctl p7zip pacman pacman-mirrorlist parole psmisc samba sudo tar tcl texinfo thunar thunar-archive-plugin thunar-volman unrar usbutils util-linux vi which xf86-input-evdev xf86-input-keyboard xf86-input-libinput xf86-input-mouse xf86-input-synaptics xf86-input-void xf86-input-wacom xf86-video-fbdev xf86-video-vesa xfce4-appfinder xfce4-artwork xfce4-battery-plugin xfce4-clipman-plugin xfce4-cpufreq-plugin xfce4-cpugraph-plugin xfce4-datetime-plugin xfce4-fsguard-plugin xfce4-genmon-plugin xfce4-mount-plugin xfce4-netload-plugin xfce4-notifyd xfce4-panel xfce4-power-manager xfce4-pulseaudio-plugin xfce4-screenshooter xfce4-sensors-plugin xfce4-session xfce4-settings xfce4-systemload-plugin xfce4-taskmanager xfce4-terminal xfce4-time-out-plugin xfce4-timer-plugin xfce4-verve-plugin xfce4-wavelan-plugin xfce4-whiskermenu-plugin xfce4-xkb-plugin xfdesktop xfwm4 xfwm4-themes xorg-fonts-100dpi xorg-fonts-75dpi xorg-iceauth xorg-server xorg-sessreg xorg-setxkbmap xorg-smproxy xorg-xauth xorg-xbacklight xorg-xcmsdb xorg-xcursorgen xorg-xdpyinfo xorg-xdriinfo xorg-xev xorg-xgamma xorg-xinput xorg-xkbevd xorg-xkbutils xorg-xkill xorg-xlsatoms xorg-xlsclients xorg-xmodmap xorg-xpr xorg-xprop xorg-xrandr xorg-xrdb xorg-xrefresh xorg-xset xorg-xsetroot xorg-xvinfo xorg-xwd xorg-xwininfo xorg-xwud yasm youtube-dl zip ">$2
-            fi
-    fi
-elif [ "$3" == "e" ]; then
-    
-    dlg='dialog --no-cancel --ok-label agree --checklist "The packagelist. Do you wish to exclude something from here? just deselect it." "" "" "" '
-    for jj in $(echo $(cat $2)); do
-        dlg+='"'"$jj"'" "" on '
-    done
-    dlg+=' 2''>'"$1"
-    eval $dlg
-    cat $1>$2
-    return 0
-fi
 }
 
 ## ---------------------- ##
@@ -158,14 +368,14 @@ fi
 ## ---------------------- ##
 
 almb(){
-## align to Mb
-## $1 -start sector
-## $2 -sector size
-if [ "$(($1*$2%(1024*1024)))" -ne 0 ]; then
-    echo $(((($1*$2/(1024*1024))+1)*1024*1024/$2))
-else
-    echo $1
-fi
+    ## align to Mb
+    ## $1 -start sector
+    ## $2 -sector size
+    if [ "$(($1*$2%(1024*1024)))" -ne 0 ]; then
+        echo $(((($1*$2/(1024*1024))+1)*1024*1024/$2))
+    else
+        echo $1
+    fi
 }
 
 ## ---------------------- ##
@@ -173,39 +383,39 @@ fi
 ## ---------------------- ##
 
 get_p_str(){
-## get partitions string
-## $1 - partition path
-## $2 - fdisk script commands
-
-if $(echo $1 | grep -q -e 'mmc' -e 'nvme'); then
-    msk_1="$1""p"
-else
-    msk_1="$1"
-fi
-if $(echo -e $2"p\nq" | fdisk "$1" | grep -q "$msk_1[1-9]"); then
-    pn_lst=$(echo -e $2"p\nq" | fdisk "$1" | grep "$msk_1[1-9]" | sed "s@.*$msk_1@@g" | sed "s/ .*//g")
-    ## single partition case
-    if [ "$(($(echo $pn_lst | sed 's/ /+/g')))" == "$pn_lst" ]; then
-        part_scheme="part$pn_lst "
-        part_scheme+="$(echo -e $2"i\nq" | fdisk "$1" | grep 'Start:' | sed 's/://g') "
-        part_scheme+="End $(($(echo -e $2"i\nq" | fdisk "$1" | grep 'End:' | sed 's/://g' | sed 's/.* //g')+0)) "
-        echo $part_scheme
+    ## get partitions string
+    ## $1 - partition path
+    ## $2 - fdisk script commands
+    
+    if $(echo $1 | grep -q -e 'mmc' -e 'nvme'); then
+        msk_1="$1""p"
     else
-    ## many partition case
-        for pn in $(echo $pn_lst); do
-            part_scheme="part$pn "
-            part_scheme+="$(echo -e $2"i\n$pn\nq" | fdisk "$1" | grep 'Start:' | sed 's/://g') "
-            part_scheme+="End $(($(echo -e $2"i\n$pn\nq" | fdisk "$1" | grep 'End:' | sed 's/://g' | sed 's/.* //g')+0)) "
-            echo $part_scheme
-        done
+        msk_1="$1"
     fi
-else
+    if $(echo -e $2"p\nq" | fdisk "$1" | grep -q "$msk_1[1-9]"); then
+        pn_lst=$(echo -e $2"p\nq" | fdisk "$1" | grep "$msk_1[1-9]" | sed "s@.*$msk_1@@g" | sed "s/ .*//g")
+        ## single partition case
+        if [ "$(($(echo $pn_lst | sed 's/ /+/g')))" == "$pn_lst" ]; then
+            part_scheme="part$pn_lst "
+            part_scheme+="$(echo -e $2"i\nq" | fdisk "$1" | grep 'Start:' | sed 's/://g') "
+            part_scheme+="End $(($(echo -e $2"i\nq" | fdisk "$1" | grep 'End:' | sed 's/://g' | sed 's/.* //g')+0)) "
+            echo $part_scheme
+        else
+            ## many partition case
+            for pn in $(echo $pn_lst); do
+                part_scheme="part$pn "
+                part_scheme+="$(echo -e $2"i\n$pn\nq" | fdisk "$1" | grep 'Start:' | sed 's/://g') "
+                part_scheme+="End $(($(echo -e $2"i\n$pn\nq" | fdisk "$1" | grep 'End:' | sed 's/://g' | sed 's/.* //g')+0)) "
+                echo $part_scheme
+            done
+        fi
+    else
     ## no partitions case
-    tmpvar08=$(echo -e $2"F\nq" | fdisk "$1" | tail -n 3 | head -n 1)
-    tmpvar09=$(echo $tmpvar08 | sed 's/.* //g')
-    tmpvar09=$(echo $tmpvar08 | sed "s/ $tmpvar09//g" |  sed 's/.* //g')
-    echo $tmpvar08 | sed "s/ $tmpvar09.*//g"
-fi
+        tmpvar08=$(echo -e $2"F\nq" | fdisk "$1" | tail -n 3 | head -n 1)
+        tmpvar09=$(echo $tmpvar08 | sed 's/.* //g')
+        tmpvar09=$(echo $tmpvar08 | sed "s/ $tmpvar09//g" |  sed 's/.* //g')
+        echo $tmpvar08 | sed "s/ $tmpvar09.*//g"
+    fi
 }
 
 ## ---------------------- ##
@@ -213,60 +423,60 @@ fi
 ## ---------------------- ##
 
 get_scl_sheme(){
-## get scatter like sheme
-## $1 - disk path
-## $2 -fdisk script commands
-
-tmp_part_string=$(mktemp XXXXXXXXX.tmp)
-tmp_sectors=$(mktemp XXXXXXXX.tmp)
-tmp_dsk_part_sh=$(mktemp XXXXXXX.tmp)
-get_p_str "$1" "$2" > $tmp_part_string
-startpoints=$(cat $tmp_part_string | sed 's/.* Start //g' | sed 's/ .*//g' | sort -n)
-endpoints=$(cat $tmp_part_string | sed 's/.* End //g' | sed 's/ .*//g' | sort -n)
-## determine disk start and end sectors
-if [ "$(echo -e $2"p\nq" | fdisk "$1" 2>&1 | grep "Disklabel type" | sed 's/.*: //g')" == "dos" ]; then
-    tmpvar14="o\nn\n\n\n\n\nq"
-else
-    tmpvar14="g\nn\n\n\n\nq"
-fi
-last_sector=$(($(echo -e "$tmpvar14" | fdisk "$1" 2>&1 | grep 'Last sector' | sed 's/.*, default //g' | sed 's/).*//g')))
-first_sector=$(echo -e "$tmpvar14" | fdisk "$1" 2>&1 | grep 'First sector' | sed 's/.*First sector (//g' | sed 's/-.*//g')
-## if disk is empty
-if [ "$(cat $tmp_part_string)" == "$(echo $first_sector $last_sector)" ]; then 
-    echo $first_sector $(($last_sector-$first_sector)) free
-else
-    #echo "$first_sector" >$tmp_sectors
-    echo "$startpoints" >$tmp_sectors
-    echo "$endpoints" >>$tmp_sectors
-    echo "$last_sector" >>$tmp_sectors
-    ## make disk partitions sheme
-    tmp_fs=$first_sector
-    echo "">$tmp_dsk_part_sh
-    for tmp_cycle in $(cat $tmp_sectors | sort -n); do
-        echo $tmp_fs $(($tmp_cycle-$tmp_fs)) >>$tmp_dsk_part_sh
-        tmp_fs=$tmp_cycle
-    done
-    echo '' >$tmp_sectors
-    tmp_sector_size=$(echo -e "p\nq" | fdisk $1 | grep "Units: sectors" | sed 's/ bytes.*//g' | sed 's/.*= //g')
-    ## mk scatter-like output
-    for ((tmp_cycle2=2;tmp_cycle2<=$(echo $(wc -l $tmp_dsk_part_sh) | sed 's/ .*//g');tmp_cycle2++)); do
-        curr_line=$(head -n $tmp_cycle2 $tmp_dsk_part_sh | tail -n 1)
-        if [ "$(echo $curr_line | sed 's/.* //g')" -gt "$((1*1024*1024/$tmp_sector_size))" ]; then
-            if ! $(cat $tmp_part_string | sed 's/ End//g' | grep -q "$(echo $curr_line | sed 's/ .*//g') $(($(echo $curr_line | sed 's/ .*//g')+$(echo $curr_line | sed 's/.* //g')))"); then
-                if $(cat $tmp_part_string | sed 's/ End.*//g' | grep -q "$(echo $curr_line | sed 's/ .*//g')"); then
-                    echo $(($(echo $curr_line | sed 's/ .*//g')+0)) $(($(echo $curr_line | sed 's/.* //g')+0)) free>>$tmp_sectors
-                else
-                    echo $curr_line free>>$tmp_sectors
+    ## get scatter like sheme
+    ## $1 - disk path
+    ## $2 -fdisk script commands
+    
+    tmp_part_string=$(mktemp XXXXXXXXX.tmp)
+    tmp_sectors=$(mktemp XXXXXXXX.tmp)
+    tmp_dsk_part_sh=$(mktemp XXXXXXX.tmp)
+    get_p_str "$1" "$2" > $tmp_part_string
+    startpoints=$(cat $tmp_part_string | sed 's/.* Start //g' | sed 's/ .*//g' | sort -n)
+    endpoints=$(cat $tmp_part_string | sed 's/.* End //g' | sed 's/ .*//g' | sort -n)
+    ## determine disk start and end sectors
+    if [ "$(echo -e $2"p\nq" | fdisk "$1" 2>&1 | grep "Disklabel type" | sed 's/.*: //g')" == "dos" ]; then
+        tmpvar14="o\nn\n\n\n\n\nq"
+    else
+        tmpvar14="g\nn\n\n\n\nq"
+    fi
+    last_sector=$(($(echo -e "$tmpvar14" | fdisk "$1" 2>&1 | grep 'Last sector' | sed 's/.*, default //g' | sed 's/).*//g')))
+    first_sector=$(echo -e "$tmpvar14" | fdisk "$1" 2>&1 | grep 'First sector' | sed 's/.*First sector (//g' | sed 's/-.*//g')
+    ## if disk is empty
+    if [ "$(cat $tmp_part_string)" == "$(echo $first_sector $last_sector)" ]; then 
+        echo $first_sector $(($last_sector-$first_sector)) free
+    else
+        #echo "$first_sector" >$tmp_sectors
+        echo "$startpoints" >$tmp_sectors
+        echo "$endpoints" >>$tmp_sectors
+        echo "$last_sector" >>$tmp_sectors
+        ## make disk partitions sheme
+        tmp_fs=$first_sector
+        echo "">$tmp_dsk_part_sh
+        for tmp_cycle in $(cat $tmp_sectors | sort -n); do
+            echo $tmp_fs $(($tmp_cycle-$tmp_fs)) >>$tmp_dsk_part_sh
+            tmp_fs=$tmp_cycle
+        done
+        echo '' >$tmp_sectors
+        tmp_sector_size=$(echo -e "p\nq" | fdisk $1 | grep "Units: sectors" | sed 's/ bytes.*//g' | sed 's/.*= //g')
+        ## mk scatter-like output
+        for ((tmp_cycle2=2;tmp_cycle2<=$(echo $(wc -l $tmp_dsk_part_sh) | sed 's/ .*//g');tmp_cycle2++)); do
+            curr_line=$(head -n $tmp_cycle2 $tmp_dsk_part_sh | tail -n 1)
+            if [ "$(echo $curr_line | sed 's/.* //g')" -gt "$((1*1024*1024/$tmp_sector_size))" ]; then
+                if ! $(cat $tmp_part_string | sed 's/ End//g' | grep -q "$(echo $curr_line | sed 's/ .*//g') $(($(echo $curr_line | sed 's/ .*//g')+$(echo $curr_line | sed 's/.* //g')))"); then
+                    if $(cat $tmp_part_string | sed 's/ End.*//g' | grep -q "$(echo $curr_line | sed 's/ .*//g')"); then
+                        echo $(($(echo $curr_line | sed 's/ .*//g')+0)) $(($(echo $curr_line | sed 's/.* //g')+0)) free>>$tmp_sectors
+                    else
+                        echo $curr_line free>>$tmp_sectors
+                    fi
                 fi
             fi
-        fi
-    done
-    for ((tmp_cycle2=1;tmp_cycle2<=$(wc -l $tmp_part_string | sed "s/ $tmp_part_string//g");tmp_cycle2++)); do
-        echo $(cat $tmp_part_string | head -n $tmp_cycle2 | tail -n 1 | sed 's/.*Start //g' | sed 's/ .*//g') $(($(echo $(cat $tmp_part_string | head -n $tmp_cycle2 | tail -n 1 | sed 's/.*Start /-/g' | sed 's/ End /+/g' | sed 's/ //g')))) $(cat $tmp_part_string | head -n $tmp_cycle2 | tail -n 1 | sed 's/ .*//g') >>$tmp_sectors
-    done
-    cat $tmp_sectors | sort -n | tail -n +2
-fi
-rm -f $tmp_part_string $tmp_sectors $tmp_dsk_part_sh
+        done
+        for ((tmp_cycle2=1;tmp_cycle2<=$(wc -l $tmp_part_string | sed "s/ $tmp_part_string//g");tmp_cycle2++)); do
+            echo $(cat $tmp_part_string | head -n $tmp_cycle2 | tail -n 1 | sed 's/.*Start //g' | sed 's/ .*//g') $(($(echo $(cat $tmp_part_string | head -n $tmp_cycle2 | tail -n 1 | sed 's/.*Start /-/g' | sed 's/ End /+/g' | sed 's/ //g')))) $(cat $tmp_part_string | head -n $tmp_cycle2 | tail -n 1 | sed 's/ .*//g') >>$tmp_sectors
+        done
+        cat $tmp_sectors | sort -n | tail -n +2
+    fi
+    rm -f $tmp_part_string $tmp_sectors $tmp_dsk_part_sh
 }
 
 ## ---------------------- ##
@@ -274,91 +484,91 @@ rm -f $tmp_part_string $tmp_sectors $tmp_dsk_part_sh
 ## ---------------------- ##
 
 get_adnf(){
-## get additional info
-## $1 - disk path
-## $2 - fdisk script variable
-## $3 - scatter like sheme
-## $4 - disk partition type dos/gpt
-
-tmpvar04=$(mktemp XXXXXXX.tmp)
-tmpvar05=$(mktemp XXXXXXX.tmp)
-tmp_parts_num=$(cat "$3" | grep -v free | grep -c part)
-
-if [ "$4" == "dos" ]; then
-    for tmp_cycle3 in $(cat "$3" | grep -v free | sed 's/.*part//g' | sed 's/ .*//g'); do
-        if [ "$tmp_parts_num" -eq 1 ]; then
-            echo -e "$2""i\nq" | fdisk "$1" > $tmpvar04
+    ## get additional info
+    ## $1 - disk path
+    ## $2 - fdisk script variable
+    ## $3 - scatter like sheme
+    ## $4 - disk partition type dos/gpt
+    
+    tmpvar04=$(mktemp XXXXXXX.tmp)
+    tmpvar05=$(mktemp XXXXXXX.tmp)
+    tmp_parts_num=$(cat "$3" | grep -v free | grep -c part)
+    
+    if [ "$4" == "dos" ]; then
+        for tmp_cycle3 in $(cat "$3" | grep -v free | sed 's/.*part//g' | sed 's/ .*//g'); do
+            if [ "$tmp_parts_num" -eq 1 ]; then
+                echo -e "$2""i\nq" | fdisk "$1" > $tmpvar04
+            else
+                echo -e "$2""i\n$tmp_cycle3\nq" | fdisk "$1" > $tmpvar04
+            fi
+            if $(cat $tmpvar04 | grep -q "Boot"); then 
+                cat "$3" | sed "s/part$tmp_cycle3/part$tmp_cycle3 Boot/g" > $tmpvar05
+                cp -f $tmpvar05 "$3"
+            fi
+            if [ "$tmp_cycle3" -gt 4 ]; then 
+                cat "$3" | sed "s/part$tmp_cycle3/part$tmp_cycle3 Logical/g" > $tmpvar05
+                cp -f $tmpvar05 "$3"
+            elif ! $(cat $tmpvar04 | grep "Type:" | grep -q "Extended"); then
+                cat "$3" | sed "s/part$tmp_cycle3/part$tmp_cycle3 Primary/g" > $tmpvar05
+                cp -f $tmpvar05 "$3"
+            fi
+            tmp_size=$(cat $tmpvar04 | grep "Size" | sed 's/.*Size: //g' | sed 's/ .*//g')
+            tmp_type=$(cat $tmpvar04 | grep "Type" | sed 's@\/@-@g' | sed 's/.*Type: //g' | sed 's/ .*//g')
+            cat "$3" | sed "s/part$tmp_cycle3/part$tmp_cycle3 $tmp_size $tmp_type/g" > $tmpvar05
+            cp -f $tmpvar05 "$3"
+        done
+        tmp_sector_size=$(echo -e "p\nq" | fdisk $1 | grep "Units: sectors" | sed 's/ bytes.*//g' | sed 's/.*= //g')
+        if $(cat "$3" | grep -q "Extended"); then
+            tmpvar06=$(cat "$3" | grep "Extended" | sed 's/ .*//g')
+            tmpvar07=$(cat "$3" | grep "Extended" | sed "s/$tmpvar06 //g" | sed 's/ .*//g')
+            ## if extended and no logical add a free extended space
+            if ! $(cat "$3" | grep -q "Logical"); then
+                echo $(($tmpvar06+1)) $(($tmpvar07-1)) free >> "$3"
+                cat "$3" | sort -n >"$tmpvar05"
+                cp -f $tmpvar05 "$3"
+            fi
+            tmpvar07=$(($tmpvar07+$tmpvar06))
         else
-            echo -e "$2""i\n$tmp_cycle3\nq" | fdisk "$1" > $tmpvar04
+            tmpvar06=0
+            tmpvar07=0
         fi
-        if $(cat $tmpvar04 | grep -q "Boot"); then 
-            cat "$3" | sed "s/part$tmp_cycle3/part$tmp_cycle3 Boot/g" > $tmpvar05
+        for tmp_cycle3 in $(echo $(cat "$3" | grep free | sed 's/ .*//g')); do
+            tmpvar16=$(cat "$3" | grep "$tmp_cycle3" | grep free | sed 's/ free.*//g' | sed "s/$tmp_cycle3 //g")
+            #tmpvar20=$(cat "$3" | sed 's/ .*//g' | grep "$tmp_cycle3" -n | sed 's/\:.*//g')
+            #tmpvar16=$(cat "$3" | head -n $tmpvar20 | tail -n 1 | sed 's/ free.*//g' | sed "s/$tmp_cycle3 //g")
+            if [ "$tmp_cycle3" -ge "$tmpvar06" ]&&[ "$tmp_cycle3" -lt "$tmpvar07" ]; then
+                if [ "$(($(cat "$3" | grep "Extended" | sed 's/ .*//g')+1))" -eq "$tmp_cycle3" ]; then
+                    tmpvar15=$(echo $(($tmp_cycle3-1+(1024*1024/$tmp_sector_size))) $(($tmpvar16+1-(1024*1024/$tmp_sector_size))) free Logical)
+                else
+                    tmpvar15=$(echo $(($tmp_cycle3+(1024*1024/$tmp_sector_size))) $(($tmpvar16-(1024*1024/$tmp_sector_size))) free Logical)
+                fi
+                ## exclude alignment waste space
+                if [ "$(($tmpvar16-(1024*1024/$tmp_sector_size)))" -gt "$((1024*1024/$tmp_sector_size))" ]; then
+                    cat "$3" | sed "s/$tmp_cycle3.*free/$tmpvar15/g" | sort -n > $tmpvar05
+                    cp -f $tmpvar05 "$3"
+                else
+                    cat "$3" | sed "s/$tmp_cycle3.*free//g" | sort -n > $tmpvar05
+                    cp -f $tmpvar05 "$3"
+                fi
+            elif [ "$(($(cat "$3" | grep part | grep "Primary" -c)+$(cat "$3" | grep "Extended" -c)))" -lt 4 ]; then
+                cat "$3" | sed "s/$(cat "$3" | grep $tmp_cycle3)/$(cat "$3" | grep $tmp_cycle3) Primary/g" > $tmpvar05
+                cp -f $tmpvar05 "$3"
+            fi
+        done
+    elif [ "$4" == "gpt" ]; then
+        for tmp_cycle3 in $(cat "$3" | grep -v free | sed 's/.*part//g' | sed 's/ .*//g'); do
+            if [ "$tmp_parts_num" -eq 1 ]; then
+                echo -e "$2""i\nq" | fdisk "$1" > $tmpvar04
+            else
+                echo -e "$2""i\n$tmp_cycle3\nq" | fdisk "$1" > $tmpvar04
+            fi
+            tmp_size=$(cat $tmpvar04 | grep "Size" | sed 's/.*Size: //g' | sed 's/ .*//g')
+            tmp_type=$(echo $(cat $tmpvar04 | grep "Type") | sed 's/.*Type: //g' | sed 's/ Type.*//g')
+            cat "$3" | sed "s/part$tmp_cycle3/part$tmp_cycle3 $tmp_size $tmp_type/g"> $tmpvar05
             cp -f $tmpvar05 "$3"
-        fi
-        if [ "$tmp_cycle3" -gt 4 ]; then 
-            cat "$3" | sed "s/part$tmp_cycle3/part$tmp_cycle3 Logical/g" > $tmpvar05
-            cp -f $tmpvar05 "$3"
-        elif ! $(cat $tmpvar04 | grep "Type:" | grep -q "Extended"); then
-            cat "$3" | sed "s/part$tmp_cycle3/part$tmp_cycle3 Primary/g" > $tmpvar05
-            cp -f $tmpvar05 "$3"
-        fi
-        tmp_size=$(cat $tmpvar04 | grep "Size" | sed 's/.*Size: //g' | sed 's/ .*//g')
-        tmp_type=$(cat $tmpvar04 | grep "Type" | sed 's@\/@-@g' | sed 's/.*Type: //g' | sed 's/ .*//g')
-        cat "$3" | sed "s/part$tmp_cycle3/part$tmp_cycle3 $tmp_size $tmp_type/g" > $tmpvar05
-        cp -f $tmpvar05 "$3"
-    done
-    tmp_sector_size=$(echo -e "p\nq" | fdisk $1 | grep "Units: sectors" | sed 's/ bytes.*//g' | sed 's/.*= //g')
-    if $(cat "$3" | grep -q "Extended"); then
-        tmpvar06=$(cat "$3" | grep "Extended" | sed 's/ .*//g')
-        tmpvar07=$(cat "$3" | grep "Extended" | sed "s/$tmpvar06 //g" | sed 's/ .*//g')
-        ## if extended and no logical add a free extended space
-        if ! $(cat "$3" | grep -q "Logical"); then
-            echo $(($tmpvar06+1)) $(($tmpvar07-1)) free >> "$3"
-            cat "$3" | sort -n >"$tmpvar05"
-            cp -f $tmpvar05 "$3"
-        fi
-        tmpvar07=$(($tmpvar07+$tmpvar06))
-    else
-        tmpvar06=0
-        tmpvar07=0
+        done
     fi
-    for tmp_cycle3 in $(echo $(cat "$3" | grep free | sed 's/ .*//g')); do
-        tmpvar16=$(cat "$3" | grep "$tmp_cycle3" | grep free | sed 's/ free.*//g' | sed "s/$tmp_cycle3 //g")
-        #tmpvar20=$(cat "$3" | sed 's/ .*//g' | grep "$tmp_cycle3" -n | sed 's/\:.*//g')
-        #tmpvar16=$(cat "$3" | head -n $tmpvar20 | tail -n 1 | sed 's/ free.*//g' | sed "s/$tmp_cycle3 //g")
-        if [ "$tmp_cycle3" -ge "$tmpvar06" ]&&[ "$tmp_cycle3" -lt "$tmpvar07" ]; then
-            if [ "$(($(cat "$3" | grep "Extended" | sed 's/ .*//g')+1))" -eq "$tmp_cycle3" ]; then
-                tmpvar15=$(echo $(($tmp_cycle3-1+(1024*1024/$tmp_sector_size))) $(($tmpvar16+1-(1024*1024/$tmp_sector_size))) free Logical)
-            else
-                tmpvar15=$(echo $(($tmp_cycle3+(1024*1024/$tmp_sector_size))) $(($tmpvar16-(1024*1024/$tmp_sector_size))) free Logical)
-            fi
-            ## exclude alignment waste space
-            if [ "$(($tmpvar16-(1024*1024/$tmp_sector_size)))" -gt "$((1024*1024/$tmp_sector_size))" ]; then
-                cat "$3" | sed "s/$tmp_cycle3.*free/$tmpvar15/g" | sort -n > $tmpvar05
-                cp -f $tmpvar05 "$3"
-            else
-                cat "$3" | sed "s/$tmp_cycle3.*free//g" | sort -n > $tmpvar05
-                cp -f $tmpvar05 "$3"
-            fi
-        elif [ "$(($(cat "$3" | grep part | grep "Primary" -c)+$(cat "$3" | grep "Extended" -c)))" -lt 4 ]; then
-            cat "$3" | sed "s/$(cat "$3" | grep $tmp_cycle3)/$(cat "$3" | grep $tmp_cycle3) Primary/g" > $tmpvar05
-            cp -f $tmpvar05 "$3"
-        fi
-    done
-elif [ "$4" == "gpt" ]; then
-    for tmp_cycle3 in $(cat "$3" | grep -v free | sed 's/.*part//g' | sed 's/ .*//g'); do
-        if [ "$tmp_parts_num" -eq 1 ]; then
-            echo -e "$2""i\nq" | fdisk "$1" > $tmpvar04
-        else
-            echo -e "$2""i\n$tmp_cycle3\nq" | fdisk "$1" > $tmpvar04
-        fi
-        tmp_size=$(cat $tmpvar04 | grep "Size" | sed 's/.*Size: //g' | sed 's/ .*//g')
-        tmp_type=$(echo $(cat $tmpvar04 | grep "Type") | sed 's/.*Type: //g' | sed 's/ Type.*//g')
-        cat "$3" | sed "s/part$tmp_cycle3/part$tmp_cycle3 $tmp_size $tmp_type/g"> $tmpvar05
-        cp -f $tmpvar05 "$3"
-    done
-fi
-rm -f $tmpvar04 $tmpvar05
+    rm -f $tmpvar04 $tmpvar05
 }
 
 ## ---------------------- ##
@@ -366,45 +576,25 @@ rm -f $tmpvar04 $tmpvar05
 ## ---------------------- ##
 
 fdisk_gui(){
-## $1 - exitstatus
-## 
-
-tmpvar01='dialog --title 'Warning' --colors --yesno "\nSimple fdisk gui. \Z1Use it with cautions.\Zn \n\nIf you are do not understand what is this for then press No. \nOtherwise you may \Z1\Zrdestroy all data\Zn from all your hard drives.\Zn \nYou have been warned.\n\nThis script provide a few basic functions. \nIf you need more than that run fdisk directly. \n\nDo you wish to continue?" "" "" ' #2>"'"$1"'"'
-eval $tmpvar01
-echo $?>"$1"
-if [ "$(cat $1)" -ne 0 ]; then return 0; fi
-
-#disks cycle
-tmp_menu_cycle00=" "
-while [ ! -z "$tmp_menu_cycle00" ]; do
-    #dd if=/dev/zero of=testdik.img bs=10M count=3
-    #tmpvar02=testdik.img
-    #tmpvar02=$(echo $(ls /dev/disk/by-id | grep -v part | grep -v wwn))
-    tmpvar02=$(echo $(ls /dev | grep -e 'sd' -e 'vd' | grep -v "[1-9]" | grep -v 'dvd'))
-    tmpvar02+=' '$(echo $(ls /dev | grep -x -e "nvme[0-9]n[0-9]" -e "mmcblk[0-9]"))
-    tmpvar01='dialog --no-cancel --radiolist "Select disk to process" "" "" "" '
-    tmpvar01+=$(mk_menu_list "$tmpvar02" "on" "1")
-    tmpvar01+=' 2>"'"$1"'"'
-    eval $tmpvar01
-
-    diskpath="/dev/$(cat $1 | sed 's/ //g')"
+    ## $1 - exitstatus
+    ## $2 - drive path
+    ## [$3] - selected part: 1 or 2 or ..
+    
+    echo ''>$1
+    tmp_oneshot=0
+    
+    diskpath="/dev/$2"
     sector_size=$(echo -e "p\nq" | fdisk $diskpath | grep "Units: sectors" | sed 's/ bytes.*//g' | sed 's/.*= //g')
-
-    if $(echo -e "i\nq" | fdisk $diskpath | grep -q "Device does not contain a recognized partition table."); then
-        dialog --msgbox "Looks like disk is empty" "5" "30"
+    
+    if $(echo -e "p\nq" | fdisk $diskpath | grep -q "Device does not contain a recognized partition table."); then
+        #dialog --msgbox "Looks like disk is empty" "5" "30"
         dialog --no-cancel --radiolist "Select partition table type" "" "" "" "dos" " - create a new empty DOS partition table (boot from BIOS)" "on" "gpt" " - create a new empty GPT partition table (boot from UEFI)" "" 2>"$1"
-    else
-        dialog --colors --defaultno --yesno "Do you want to re-create \na partitions table?\n\n\Z1All existed data will be lost\Zn." "" ""
-        if [ $? -eq 0 ];then
-            dialog --no-cancel --radiolist "Select partition table type" "" "" "" "dos" " - boot from BIOS" "on" "gpt" " - boot from UEFI" "" 2>"$1"
-            #diskpath="--wipe always $diskpath"
-        fi
     fi
-
     if [ "$(cat $1)" == "dos" ]; then fdisk_script="$fdisk_script\no\n"
     elif [ "$(cat $1)" == "gpt" ]; then fdisk_script="$fdisk_script\ng\n"
     else fdisk_script=''
     fi
+    
     part_table_type=$(echo -e "$fdisk_script""\np\nq" | fdisk $diskpath | grep 'Disklabel type:' | sed 's/.*isklabel type: //g')
     tmp_menu_cycle01=" "
     while [ ! -z "$tmp_menu_cycle01" ]; do
@@ -419,12 +609,31 @@ while [ ! -z "$tmp_menu_cycle00" ]; do
         tmpvar10=$(mk_menu_list "$(echo $(cat $1 | sed 's/.*part/part/g' | sed 's/ /_/g'))" "" "")
         #tmpvar10=$(mk_menu_list "$(echo $(cat $1 | sed 's/ /_/g'))" "" "")
         tmpvar10=$(echo $tmpvar10 | sed 's/_/ /g')
-        tmpvar10+=" ' Write ALL changes and exit' '' '' ' Discard ANY changes and exit' '' 'on' "
+        tmpvar10+=" ' Write ALL changes and exit' '' '' ' Discard ANY changes and exit' '' 'on' 'New partition table' '' '' "
         tmpvar10="dialog --no-cancel --radiolist 'Select partition or free space \n\nUse arrow keys, space-key and enter.' '' '' '' $tmpvar10 " 
         tmpvar10+=' 2>"'"$1"'"'
-        #echo $fdisk_script
-        #sleep 7
-        eval $tmpvar10
+        if [ ! -z "$3" ]&&[ "$tmp_oneshot" -eq 0 ]; then
+            echo "part$(echo $3 | sed "s/$2//g" | sed 's/p//g')">$1
+        else
+            eval $tmpvar10
+        fi
+        tmp_oneshot=1
+        if $(cat "$1" | grep -q 'New partition table' ); then
+            if $(mount | grep -q "$diskpath"); then
+                dialog --msgbox 'Some partition from disk '$diskpath' allready mounted.\nIt should be unmounted first.' '6' '55'
+                echo ''>"$1"
+            else
+                dialog --colors --defaultno --yesno "Do you want to re-create \na partitions table?\n\n\Z1All existed data will be lost\Zn." "" ""
+                if [ $? -eq 0 ];then
+                    dialog --no-cancel --radiolist "Select partition table type" "" "" "" "dos" " - boot from BIOS" "on" "gpt" " - boot from UEFI" "" 2>"$1"
+                    #diskpath=" --wipe always $diskpath "
+                fi
+                if [ "$(cat $1)" == "dos" ]; then fdisk_script="$fdisk_script\no\n"
+                elif [ "$(cat $1)" == "gpt" ]; then fdisk_script="$fdisk_script\ng\n"
+                else echo ''>"$1" #; fdisk_script=''
+                fi
+            fi
+        fi
         
         if $(cat "$1" | grep -q free); then
             if [ "$part_table_type" == "dos" ]; then
@@ -466,7 +675,6 @@ while [ ! -z "$tmp_menu_cycle00" ]; do
                     else
                         fdisk_script_tmp="$fdisk_script""n\n$tmpvar17\n\n$(cat $1)\n"
                     fi
-                    
                     dialog --no-cancel --title "End sector of new DOS partition" --inputbox "\n($part_of - $(($part_of+$part_sz-0)))\nor +/-sectors or +/-size{K,M,G,T,P}\n(current hard drive sector size is $sector_size bytes)" '' '' "$(($part_of+$part_sz-0))" 2>"$1"
                     fdisk_script_tmp="$fdisk_script_tmp""$(cat $1)\n"
                     if $(echo -e "$fdisk_script_tmp""\n\n\n\n\nq" | fdisk $diskpath 2>&1 | grep -q "Value out of range")||$(echo -e "$fdisk_script_tmp""\n\n\n\n\nq" | fdisk $diskpath 2>&1 | grep -q "unknown command"); then
@@ -496,57 +704,109 @@ while [ ! -z "$tmp_menu_cycle00" ]; do
                 fi
             fi
         elif $(cat "$1" | grep -q part); then
-            if [ "$part_table_type" == "dos" ]; then
-                tmpvar13=$(cat "$1" | grep part | sed 's/.*part//g')
-                tmpvar11=$(cat "$1" | grep part | sed 's/.*part//g' | sed 's/ .*//g')
-                if $(cat "$1" | grep "part$tmpvar11" | grep -q Extended); then
-                    dialog --radiolist 'Edit partition menu' '' '' '' 'delete partition' '' '' 2> "$1"
-                else
-                    dialog --radiolist 'Edit partition menu' '' '' '' 'delete partition' '' '' 'change partition type' '' '' 'switch boot flag' '' ''  2> "$1"
-                fi
-                if $(cat "$1" | grep -q delete); then
-                    if $(echo $tmpvar13 | grep -q "Extended"); then
-                        dialog --colors --yesno '\Z1Warning! Removing Extended partition leads to remove all logical partitions!\Zn\n\nDo you wish to proceed?' '' ''
-                        if [ $? -eq 0 ]; then
+            if $(mount | grep -q "$diskpath$(cat $1 | sed 's/.*part//g' | sed 's/ .*//g')")||$(mount | grep -q "$diskpath"p"$(cat $1 | sed 's/.*part//g' | sed 's/ .*//g')"); then
+                dialog --msgbox 'Partition allready mounted.\nUnmount it before editing.' '6' '35'
+                echo ''>"$1"
+            else
+                if [ "$part_table_type" == "dos" ]; then
+                    tmpvar13=$(cat "$1" | grep part | sed 's/.*part//g')
+                    tmpvar11=$(cat "$1" | grep part | sed 's/.*part//g' | sed 's/ .*//g')
+                    if $(cat "$1" | grep "part$tmpvar11" | grep -q Extended); then
+                        dialog --radiolist 'Edit partition menu' '' '' '' 'delete partition' '' '' 2> "$1"
+                    else
+                        dialog --radiolist 'Edit partition menu' '' '' '' 'delete partition' '' '' 'change partition type' '' '' 'switch boot flag' '' ''  2> "$1"
+                    fi
+                    if $(cat "$1" | grep -q delete); then
+                        if $(echo $tmpvar13 | grep -q "Extended"); then
+                            dialog --colors --yesno '\Z1Warning! Removing Extended partition leads to remove all logical partitions!\Zn\n\nDo you wish to proceed?' '' ''
+                            if [ $? -eq 0 ]; then
+                                if [ "$curr_parts" -eq 1 ]; then
+                                    fdisk_script="$fdisk_script""d\n"
+                                else
+                                    fdisk_script="$fdisk_script""d\n$tmpvar11\n"
+                                fi
+                            fi
+                        else
                             if [ "$curr_parts" -eq 1 ]; then
                                 fdisk_script="$fdisk_script""d\n"
                             else
                                 fdisk_script="$fdisk_script""d\n$tmpvar11\n"
                             fi
                         fi
-                    else
+                    elif $(cat "$1" | grep -q change); then
+                        ## detect current type
+                        if [ "$curr_parts" -eq 1 ]; then
+                            tmpvar12=$(echo -e "$fdisk_script""\ni\nq" | fdisk $diskpath | grep "Id:" | sed 's/.*Id: //g' | sed 's/ .*//g')
+                        else
+                            tmpvar12=$(echo -e "$fdisk_script""\ni\n$tmpvar11\nq" | fdisk $diskpath | grep "Id:" | sed 's/.*Id: //g' | sed 's/ .*//g')
+                        fi
+                        ## make menulist
+                        tmpvar266=''
+                        tmpvar10=''
+                        for tmp_cycle4 in $(echo $(echo -e "o\n\nl\nq" | fdisk $diskpath |  grep " [0-9,a-f][0-9,a-f] " | sed "s/['/()-]//g")); do
+                            if $(echo $tmp_cycle4 | grep -xq "[0-9,a-f][0-9,a-f]"); then
+                                tmpvar10+="' '$tmpvar266'\n '$tmp_cycle4' '"
+                                if [ "$tmpvar12" == "$tmp_cycle4" ]; then
+                                    tmpvar266='on'
+                                else
+                                    tmpvar266=''
+                                fi
+                            else
+                                tmpvar10+=" $tmp_cycle4"
+                            fi
+                        done
+                        echo ''>$1
+                        #tmpvar10+="' ''"
+                        tmpvar10="dialog --no-cancel --radiolist 'Change DOS partition TYPE menu' '' '' '' $(echo $(echo -e $tmpvar10 | sort)) "' 2>"'"$1"'"'
+                        eval $tmpvar10
+                        if [ $? -eq 0 ]; then
+                            tmpvar10=$(cat $1 | sed 's/ .*//g')
+                            if [ "$tmpvar12" != "$tmpvar10" ]; then
+                                if [ "$curr_parts" -eq 1 ]; then
+                                    fdisk_script="$fdisk_script""t\n$tmpvar10\n"
+                                else
+                                    fdisk_script="$fdisk_script""t\n$tmpvar11\n$tmpvar10\n"
+                                fi
+                            fi
+                        fi
+                    elif $(cat "$1" | grep -q boot); then
+                        if [ "$curr_parts" -eq 1 ]; then
+                            fdisk_script="$fdisk_script""\na\n"
+                        else
+                            fdisk_script="$fdisk_script""\na\n$tmpvar11\n"
+                        fi
+                    fi
+                elif [ "$part_table_type" == "gpt" ]; then
+                    tmpvar11=$(cat $1 | grep part | sed 's/.*part//g' | sed 's/ .*//g')
+                    dialog --radiolist 'Edit partition menu' '' '' '' 'delete partition' '' '' 'change partition type' '' '' 2> "$1"
+                    if $(cat "$1" | grep -q delete); then
                         if [ "$curr_parts" -eq 1 ]; then
                             fdisk_script="$fdisk_script""d\n"
                         else
                             fdisk_script="$fdisk_script""d\n$tmpvar11\n"
                         fi
-                    fi
-                elif $(cat "$1" | grep -q change); then
-                    ## detect current type
-                    if [ "$curr_parts" -eq 1 ]; then
-                        tmpvar12=$(echo -e "$fdisk_script""\ni\nq" | fdisk $diskpath | grep "Id:" | sed 's/.*Id: //g' | sed 's/ .*//g')
-                    else
-                        tmpvar12=$(echo -e "$fdisk_script""\ni\n$tmpvar11\nq" | fdisk $diskpath | grep "Id:" | sed 's/.*Id: //g' | sed 's/ .*//g')
-                    fi
-                    ## make menulist
-                    echo -e "o\n\nl\nq" | fdisk $diskpath | sed "s/Command (m for help): //g" | grep " [0-9,a-f][0-9,a-f] " | sed 's/ /@/g' | sed "s/'//g">$1
-                    tmpvar10=''
-                    for tmp_cycle4 in $(echo $(echo -e $(echo $(echo -e "o\n\nl\nq" | fdisk $diskpath | sed "s/Command (m for help): //g" | grep " [0-9,a-f][0-9,a-f] ") | sed 's/ /\\n/g')| grep -x "[0-9,a-f]") $(echo -e $(echo $(echo -e "o\n\nl\nq" | fdisk $diskpath | sed "s/Command (m for help): //g" | grep " [0-9,a-f][0-9,a-f] ") | sed 's/ /\\n/g')| grep -x "[0-9,a-f][0-9,a-f]")); do
-                        tmpvar10+=$(echo "'"$tmp_cycle4"' '"'@'$(echo $(cat "$1") | sed 's/ /@/g' | sed "s/.*@$tmp_cycle4@//g" | sed 's/@[0-9,a-f][0-9,a-f@]@.*//g')"' ")
-                        if [ "$tmp_cycle4" == "$tmpvar12" ]; then
-                            tmpvar10+="'on' "
+                    elif $(cat "$1" | grep -q change); then
+                        ## detect current type
+                        if [ "$curr_parts" -eq 1 ]; then
+                            tmpvar12=$(echo $(echo -e "g\n\nl\nq" | fdisk $diskpath | sed "s/Command (m for help): //g" | grep -e "$(echo $(echo -e "$fdisk_script""\ni\nq" | fdisk $diskpath | grep "Type-UUID:") | sed 's/.*Type-UUID: //g' | sed 's/ .*//g')") | sed 's/ .*//g')
                         else
-                            tmpvar10+="'' "
+                            tmpvar12=$(echo $(echo -e "g\n\nl\nq" | fdisk $diskpath | sed "s/Command (m for help): //g" | grep -e "$(echo $(echo -e "$fdisk_script""\ni\n$tmpvar11\nq" | fdisk $diskpath | grep "Type-UUID:") | sed 's/.*Type-UUID: //g' | sed 's/ .*//g')") | sed 's/ .*//g')
                         fi
-                    done
-                    tmpvar10="dialog --no-cancel --radiolist 'Change DOS partition TYPE menu\nsome partition types may fail this script' '' '' '' $tmpvar10"
-                    tmpvar10=$(echo $tmpvar10 | sed 's/@/ /g' | sed 's/(//g' | sed 's/)//g')
-                    tmpvar10+=' 2>"'"$1"'"'
-                     
-                    eval $tmpvar10
-                    if [ $? -eq 0 ]; then
+                        ## make menulist
+                        echo -e "$(echo -e "g\n\nl\nq" | fdisk $diskpath)" | sed "s/Command (m for help): //g" | grep -e "[ ][ ,1-9][0-9][ ][A-Z]" | sed 's/[0-9,A-Z][0-9,A-Z][0-9,A-Z][0-9,A-Z][0-9,A-Z][0-9,A-Z][0-9,A-Z][0-9,A-Z]-.*//g' > "$1"
+                        tmpvar10="dialog --no-cancel --radiolist 'Change GPT partition TYPE menu' '' '' '' "
+                        for ((tmp_cycle4=1;tmp_cycle4<=$(echo $(wc -l "$1") | sed 's/ .*//g');tmp_cycle4++)); do
+                            if [ "$tmp_cycle4" == "$tmpvar12" ]; then
+                                tmpvar10+="'$(echo $(cat $1 | head -n $tmp_cycle4 | tail -n 1 | sed "s/'/~/g"))' '' 'on' "
+                            else
+                                tmpvar10+="'$(echo $(cat $1 | head -n $tmp_cycle4 | tail -n 1 | sed "s/'/~/g"))' '' '' "
+                            fi
+                        done
+                        tmpvar10+=' 2>"'"$1"'"'
+                        
+                        eval $tmpvar10
                         tmpvar10=$(cat $1 | sed 's/ .*//g')
-                        if [ "$tmpvar12" != "$tmpvar10" ]; then
+                        if [ "$tmpvar12" -ne "$tmpvar10" ]; then
                             if [ "$curr_parts" -eq 1 ]; then
                                 fdisk_script="$fdisk_script""t\n$tmpvar10\n"
                             else
@@ -554,70 +814,91 @@ while [ ! -z "$tmp_menu_cycle00" ]; do
                             fi
                         fi
                     fi
-                elif $(cat "$1" | grep -q boot); then
-                    if [ "$curr_parts" -eq 1 ]; then
-                        fdisk_script="$fdisk_script""\na\n"
-                    else
-                        fdisk_script="$fdisk_script""\na\n$tmpvar11\n"
-                    fi
                 fi
-            elif [ "$part_table_type" == "gpt" ]; then
-                tmpvar11=$(cat $1 | grep part | sed 's/.*part//g' | sed 's/ .*//g')
-                dialog --radiolist 'Edit partition menu' '' '' '' 'delete partition' '' '' 'change partition type' '' '' 2> "$1"
-                if $(cat "$1" | grep -q delete); then
-                    if [ "$curr_parts" -eq 1 ]; then
-                        fdisk_script="$fdisk_script""d\n"
-                    else
-                        fdisk_script="$fdisk_script""d\n$tmpvar11\n"
-                    fi
-                elif $(cat "$1" | grep -q change); then
-                    ## detect current type
-                    if [ "$curr_parts" -eq 1 ]; then
-                        tmpvar12=$(echo $(echo -e "g\n\nl\nq" | fdisk $diskpath | sed "s/Command (m for help): //g" | grep -e "$(echo $(echo -e "$fdisk_script""\ni\nq" | fdisk $diskpath | grep "Type-UUID:") | sed 's/.*Type-UUID: //g' | sed 's/ .*//g')") | sed 's/ .*//g')
-                    else
-                        tmpvar12=$(echo $(echo -e "g\n\nl\nq" | fdisk $diskpath | sed "s/Command (m for help): //g" | grep -e "$(echo $(echo -e "$fdisk_script""\ni\n$tmpvar11\nq" | fdisk $diskpath | grep "Type-UUID:") | sed 's/.*Type-UUID: //g' | sed 's/ .*//g')") | sed 's/ .*//g')
-                    fi
-                    ## make menulist
-                    echo -e "$(echo -e "g\n\nl\nq" | fdisk $diskpath)" | sed "s/Command (m for help): //g" | grep -e "[ ][ ,1-9][0-9][ ][A-Z]" | sed 's/[0-9,A-Z][0-9,A-Z][0-9,A-Z][0-9,A-Z][0-9,A-Z][0-9,A-Z][0-9,A-Z][0-9,A-Z]-.*//g' > "$1"
-                    tmpvar10="dialog --no-cancel --radiolist 'Change GPT partition TYPE menu' '' '' '' "
-                    for ((tmp_cycle4=1;tmp_cycle4<=$(echo $(wc -l "$1") | sed 's/ .*//g');tmp_cycle4++)); do
-                        if [ "$tmp_cycle4" == "$tmpvar12" ]; then
-                            tmpvar10+="'$(echo $(cat $1 | head -n $tmp_cycle4 | tail -n 1 | sed "s/'/~/g"))' '' 'on' "
-                        else
-                            tmpvar10+="'$(echo $(cat $1 | head -n $tmp_cycle4 | tail -n 1 | sed "s/'/~/g"))' '' '' "
-                        fi
-                    done
-                    tmpvar10+=' 2>"'"$1"'"'
-                     
-                    eval $tmpvar10
-                    tmpvar10=$(cat $1 | sed 's/ .*//g')
-                    if [ "$tmpvar12" -ne "$tmpvar10" ]; then
-                        if [ "$curr_parts" -eq 1 ]; then
-                            fdisk_script="$fdisk_script""t\n$tmpvar10\n"
-                        else
-                            fdisk_script="$fdisk_script""t\n$tmpvar11\n$tmpvar10\n"
-                        fi
-                    fi
-                fi
-                
-                
             fi
         fi
         if $(cat $1 | grep -q exit); then tmp_menu_cycle01=""; fi
         if $(cat $1 | grep -q "Write ALL"); then 
-            dialog --defaultno --colors --yesno '\Z1.... Are you sure? ....\n\nChanges will be writed.\n\nAll data from modified\npartitions will be \Zrlost\Zn' '' ''
-            if [ $? -eq 0 ]; then
-                echo -e "$fdisk_script""\nw" | fdisk $diskpath
-                sleep 10
-                partprobe
-                tmp_menu_cycle01=""
-            fi
+            #if $(mount | grep -q "$diskpath$(cat $1 | sed 's/.*part//g' | sed 's/ .*//g')")||$(mount | grep -q "$diskpath"p"$(cat $1 | sed 's/.*part//g' | sed 's/ .*//g')"); then
+            #    dialog --msgbox 'Partition allready mounted.\nWrite action is forbidden.' '6' '35'
+            #    echo ''>"$1"
+            #else
+                dialog --defaultno --colors --yesno '\Z1.... Are you sure? ....\n\nChanges will be writed.\n\nAll data from modified\npartitions will be \Zrlost\Zn' '' ''
+                if [ $? -eq 0 ]; then
+                    if $(echo -E "$fdisk_script" | grep -q '\\n[og]\\n' ); then
+                        wipefs -a $diskpath |& tee -a install.log
+                    fi
+                    echo -e "$fdisk_script""\nw" | fdisk $diskpath |& tee -a install.log
+                    sync
+                    partprobe
+                    tmp_menu_cycle01=""
+                fi
+            #fi
         fi
     done
-    fdisk_script=''
-    dialog --no-cancel --radiolist ' What is your next step?' '' '' '' 'select another disk to edit' '' '' 'exit from fdisk simple gui' '' 'on' 2>"$1"
-    if $(cat $1 | grep -q exit); then tmp_menu_cycle00=""; fi
-done 
+}
+
+## ---------------------- ##
+## next internal function ##
+## ---------------------- ##
+
+gsdl(){
+    ## get storage devices list
+    ## $1 exitfile
+    ## $2 storage type: d -devices p - partitions
+    if [ "$2" == "d" ]; then
+        gsdl_var01=$(echo $(ls /dev | grep -e 'sd' -e 'vd' | grep -v "[1-9]" | grep -v -e 'dvd' -e 'sr'))
+        gsdl_var01+=' '$(echo $(ls /dev | grep -e "nvme[0-9]n[0-9]" -e "mmcblk[0-9]" | grep -v "p[0-9]"))
+    elif [ "$2" == "p" ]; then
+        gsdl_var01=$(echo $(ls /dev | grep -e 'sd' -e 'vd' | grep "[1-9]" | grep -v -e 'dvd' -e 'sr'))
+        gsdl_var01+=' '$(echo $(ls /dev | grep -e "nvme[0-9]n[0-9]" -e "mmcblk[0-9]" | grep "p[0-9]"))
+    else
+        gsdl_var01=$(echo $(ls /dev | grep -e 'sd' -e 'vd' | grep -v -e 'dvd' -e 'sr'))
+        gsdl_var01+=' '$(echo $(ls /dev | grep -e "nvme[0-9]n[0-9]" -e "mmcblk"))
+    fi
+    echo "$gsdl_var01" >$1
+}
+
+## ---------------------- ##
+## next internal function ##
+## ---------------------- ##
+
+pp(){
+    ## partition process
+    ## $1 exitstatus
+    
+    pp_endlesss_cycle=''
+    while [ "$pp_endlesss_cycle" != "Done" ]; do
+        echo ''>"$1"
+        gsdl "$1" 
+        pp_var1="$(cat $1)"
+        pp_var2='dialog --no-cancel --radiolist "Disk partitioning (fdisk).\nChoose disk or part\nfor simple manipulation." "" "" "" '
+        gsdl "$1" "d"
+        pp_var3=$(cat "$1")
+        for pp_cycle in $(echo $pp_var1); do
+            if $(cat "$1" | grep -q "$pp_cycle"); then
+                pp_var2+="'$pp_cycle' '' '' "
+            else
+                pp_var2+="' $pp_cycle' '' '' "
+            fi
+        done
+        pp_var2+="'Done' '' 'on' "
+        pp_var2+=' 2>"'"$1"'"'
+        eval $pp_var2
+        pp_endlesss_cycle=$(cat "$1" | sed 's/ //g')
+        if $(echo $pp_var3 | grep -vq "Done"); then
+            if $(echo $pp_var3 | grep -q "$pp_endlesss_cycle"); then
+                fdisk_gui "$1" "$pp_endlesss_cycle"
+            else
+                for pp_cycle2 in $pp_var3; do
+                    if $(echo $pp_endlesss_cycle | grep -q "$pp_cycle2"); then
+                        fdisk_gui "$1" "$pp_cycle2" "$(echo $pp_endlesss_cycle | sed 's/ //g')"
+                    fi
+                done
+            fi
+            echo '' >"$1"
+        fi
+    done
 }
 
 ## ---------------------- ##
@@ -625,102 +906,112 @@ done
 ## ---------------------- ##
 
 ft_n_mt(){
-##format and mount
-## $1 - part string
-## $2 - diskpath
-
-if $(echo $2 | grep -q loop)||$(echo $2 | grep -q mmc); then
-    tmp_dskpath=$2'p'
-else
-    tmp_dskpath=$2
-fi
-tmp_fs_mount_opt=''
-for tmp_cycle7 in $(echo "$1" | sed "s/@/ /g" ); do
-    if $(echo $tmp_cycle7 | grep -q part ); then
-        if $(echo $tmp_cycle7 | grep -q "luks" ); then
-            tmp_part_path="/dev/mapper/$tmp_cycle7"
-        else
-            tmp_part_path="$tmp_dskpath$(echo $tmp_cycle7 | sed 's/part//g')"
-        fi
-    elif $(echo $tmp_cycle7 | grep -q zlib )||$(echo $tmp_cycle7 | grep -q zstd ); then
-        tmp_fs_mount_opt=" -o,compress=$tmp_cycle7"
-    elif $(echo $tmp_cycle7 | grep -q "/" ); then
-        if [ "$tmp_cycle7" == "/" ]; then
-            tmp_part_label=rootfs
-        elif [ "$tmp_cycle7" == "/bootefi" ]; then
-            tmp_part_label=ESP
-        else
-            tmp_part_label=$(echo "$tmp_cycle7" | sed 's|\/||g')
-        fi
-        tmp_mount_point="$tmp_cycle7"
-    elif $(echo $tmp_cycle7 | grep -q "hash=" ); then
-        tmp_luks_hash_algo=$(echo $tmp_cycle7 | sed 's/hash=//g')
-    elif $(echo $tmp_cycle7 | grep -q "[0-9][0-9][0-9]b" ); then
-        tmp_luks_key_size=$tmp_cycle7
-    elif $(echo $tmp_cycle7 | grep -q "[cbc,xts]" ); then
-        tmp_luks_sheme=$tmp_cycle7
-    fi    
+    ##format and mount
+    ## $1 - part string
+    ## $2 - diskpath
     
-done
-## format partition
-tmp_fs_type=''
-if $(echo "$1" | grep -q fat);then
-    if [ "$tmp_part_label" == "ESP" ]; then
-        mkfs.fat -s1 -F 32 -n "$tmp_part_label" $tmp_part_path
-        tmp_fs_type=fat
-    else
-        mkfs.fat -F 32 -n "$tmp_part_label" $tmp_part_path
-        tmp_fs_type=fat
-    fi
-elif $(echo "$1" | grep -q ntfs);then
-    mkntfs -f -L "$tmp_part_label" $tmp_part_path
-    tmp_fs_type=ntfs
-elif $(echo "$1" | grep -q f2fs);then
-    if $(echo "$1" | grep -q ',');then
-        for tmp_cycle7 in $(echo "$1" | sed "s/@/ /g" ); do
-            if $(echo $tmp_cycle7 | grep -q ',');then
-                tmpvar24=$(echo "$tmp_cycle7 " | sed 's/, //g')
+#     if $(echo $2 | grep -q -e "loop" -e "mmc" -e "nvme"); then
+#         tmp_dskpath=$2'p'
+#     else
+         tmp_dskpath=$2
+#     fi
+    tmp_fs_mount_opt=''
+    for tmp_cycle7 in $(echo "$1" | sed "s/@/ /g" ); do
+        if $(echo $tmp_cycle7 | grep -q part ); then
+            tmp_part_path="$tmp_dskpath$(echo $tmp_cycle7 | sed 's/part//g')"
+        elif $(echo $tmp_cycle7 | grep -q zlib )||$(echo $tmp_cycle7 | grep -q zstd ); then
+            tmp_fs_mount_opt=" -o,compress=$tmp_cycle7"
+        elif $(echo $tmp_cycle7 | grep -q "/" ); then
+            if [ "$tmp_cycle7" == "/" ]; then
+                tmp_part_label=rootfs
+            elif [ "$tmp_cycle7" == "/bootefi" ]; then
+                tmp_part_label=ESP
+            else
+                tmp_part_label=$(echo "$tmp_cycle7" | sed 's|\/||g')
             fi
-        done
-        mkfs.f2fs -f -O $tmpvar24 -l "$tmp_part_label" $tmp_part_path
-        tmp_fs_type=f2fs
-    else
-        mkfs.f2fs -f -l "$tmp_part_label" $tmp_part_path
-        tmp_fs_type=f2fs
+            tmp_mount_point="$tmp_cycle7"
+        fi    
+    done
+    
+    ## format partition
+    tmp_fs_type=''
+    if $(echo "$1" | grep -q fat);then
+        if [ "$tmp_part_label" == "ESP" ]; then
+            mkfs.fat -s1 -F 32 -n "$tmp_part_label" $tmp_part_path
+            tmp_fs_type=fat
+        else
+            mkfs.fat -F 32 -n "$tmp_part_label" $tmp_part_path
+            tmp_fs_type=fat
+        fi
+    elif $(echo "$1" | grep -q ntfs);then
+        mkntfs -f -L "$tmp_part_label" $tmp_part_path
+        tmp_fs_type=ntfs
+    elif $(echo "$1" | grep -q f2fs);then
+        if $(echo "$1" | grep -q ',');then
+            for tmp_cycle7 in $(echo "$1" | sed "s/@/ /g" ); do
+                if $(echo $tmp_cycle7 | grep -q ',');then
+                    tmpvar24=$(echo "$tmp_cycle7 " | sed 's/, //g')
+                fi
+            done
+            mkfs.f2fs -f -O $tmpvar24 -l "$tmp_part_label" $tmp_part_path
+            tmp_fs_type=f2fs
+        else
+            mkfs.f2fs -f -l "$tmp_part_label" $tmp_part_path
+            tmp_fs_type=f2fs
+        fi
+    elif $(echo "$1" | grep -q btrfs);then
+        mkfs.btrfs -f --label "$tmp_part_label" $tmp_part_path
+        tmp_fs_type=btrfs
+    elif $(echo "$1" | grep -q ext4);then
+        mke2fs -F -t ext4 -L "$tmp_part_label" $tmp_part_path
+        tmp_fs_type=ext4
+    elif $(echo "$1" | grep -q swap);then
+        mkswap $tmp_part_path
+        swapon $tmp_part_path
     fi
-elif $(echo "$1" | grep -q btrfs);then
-    mkfs.btrfs -f --label "$tmp_part_label" $tmp_part_path
-    tmp_fs_type=btrfs
-elif $(echo "$1" | grep -q ext4);then
-    mke2fs -F -t ext4 -L "$tmp_part_label" $tmp_part_path
-    tmp_fs_type=ext4
-elif $(echo "$1" | grep -q swap);then
-    mkswap $tmp_part_path
-    swapon $tmp_part_path
-elif $(echo "$1" | grep -q "@luks@");then
-    echo luks currently not supported
-fi
-## mount partition
-if $(echo "$1" | grep -q "@/");then
-    if [ "$tmp_part_label" != "rootfs" ]&&[ "$tmp_part_label" != "ESP" ]; then 
-        tmp_part_label='/'$tmp_part_label
-        mkdir /mnt$tmp_part_label
-    elif [ "$tmp_part_label" == "ESP" ]; then 
-        tmp_part_label='/boot/efi'
-        if [ ! -d /mnt/boot ]; then mkdir /mnt/boot; fi
-        mkdir /mnt/boot/efi
-        tmp_fs_type=''
-    else
-        tmp_part_label=''
+    
+    ## mount partition
+    if $(echo "$1" | grep -q "@/");then
+        if [ "$tmp_part_label" != "rootfs" ]&&[ "$tmp_part_label" != "ESP" ]; then 
+            tmp_part_label='/'$tmp_part_label
+            mkdir /mnt$tmp_part_label
+        elif [ "$tmp_part_label" == "ESP" ]; then 
+            tmp_part_label='/boot/efi'
+            if [ ! -d /mnt/boot ]; then mkdir /mnt/boot; fi
+            mkdir /mnt/boot/efi
+            tmp_fs_type=''
+        else
+            tmp_part_label=''
+        fi
+        if [ ! -z "$tmp_fs_mount_opt" ]; then
+            mount $tmp_part_path -t $tmp_fs_type $tmp_fs_mount_opt /mnt$tmp_part_label
+        elif [ ! -z "$tmp_fs_type" ]; then
+            mount $tmp_part_path -t $tmp_fs_type /mnt$tmp_part_label
+        else
+            mount $tmp_part_path /mnt$tmp_part_label
+        fi
     fi
-    if [ ! -z "$tmp_fs_mount_opt" ]; then
-        mount $tmp_part_path -t $tmp_fs_type $tmp_fs_mount_opt /mnt$tmp_part_label
-    elif [ ! -z "$tmp_fs_type" ]; then
-        mount $tmp_part_path -t $tmp_fs_type /mnt$tmp_part_label
-    else
-        mount $tmp_part_path /mnt$tmp_part_label
+}
+
+## ---------------------- ##
+## next internal function ##
+## ---------------------- ##
+
+plbtrfs(){
+    ## $1 - exitfile
+    gsdl "$1" 'd'
+    plbtrfs_var1='dialog --no-cancel --radiolist "Choose disk for partitionless btrfs sheme.\nIt will be formated and mounted without questions." "" "" "" '
+    plbtrfs_var1+="$(mk_menu_list "$(echo $(cat "$1"))" '' '') "
+    plbtrfs_var1+="'None' '' 'on' "
+    plbtrfs_var1+=' 2>"'"$1"'"'
+    echo ''>"$1"
+    eval $plbtrfs_var1
+    plbtrfs_var2=$(cat "$1")
+    
+    if [ ! -z "$plbtrfs_var2" ]&&[ "$plbtrfs_var2" != "None" ]; then
+        mkfs.btrfs -f --label rootfs /dev/$plbtrfs_var2 |& tee -a install.log
+        mount /dev/$plbtrfs_var2 /mnt
     fi
-fi
 }
 
 ## ---------------------- ##
@@ -728,219 +1019,188 @@ fi
 ## ---------------------- ##
 
 disk_fnm(){
-## $1 - exitstatus
-## $2 - disk image path
-if [ -z $2 ]; then
-    tmpvar01='dialog --title 'Warning' --colors --yesno "\nSimple disk formatter and mounter. \Z1Use it with cautions.\Zn \n\nYou still can \Z1\Zrdestroy all data\Zn from all your hard drives.\Zn \nYou have been warned.\n\nThis script provide a few basic functions. \nIf you need more than that use command promt directly. \n\nDo you wish to continue?" "" "" ' #2>"'"$1"'"'
-    eval $tmpvar01
-    echo $?>"$1"
-    if [ "$(cat $1)" -ne 0 ]; then return 0; fi
-fi
-partprobe
-#mount_ponts='/ /boot /home /var /tmp /usr'
-tmp_menu_cycle00=" "
-#luks_tests=$(mktemp XXXXXXX.tmp)
-while [ ! -z "$tmp_menu_cycle00" ]; do
-    mount_ponts='/ /boot /home /var /tmp /usr'
-    if [ ! -z $2 ]; then
-        tmpvar02="$2"
-    else
-        #tmpvar02=testdik.img
-        #tmpvar02=$(echo $(ls /dev/disk/by-id | grep -v part | grep -v wwn))
-        tmpvar02=$(echo $(ls /dev | grep -e 'sd' -e 'vd' | grep -v "[1-9]" | grep -v 'dvd'))
-        tmpvar02+=' '$(echo $(ls /dev | grep -x -e "nvme[0-9]n[0-9]" -e "mmcblk[0-9]"))
-    fi
-    tmpvar01='dialog --no-cancel --radiolist "Select disk to process" "" "" "" '
-    tmpvar01+=$(mk_menu_list "$tmpvar02" "on" "1")
-    tmpvar01+=' 2>"'"$1"'"'
-    eval $tmpvar01
-
-    diskpath="/dev/$(cat $1 | sed 's/ //g')"
-    sector_size=$(echo -e "p\nq" | fdisk $diskpath | grep "Units: sectors" | sed 's/ bytes.*//g' | sed 's/.*= //g')
-
-    if $(echo -e "i\n\nq" | fdisk $diskpath | grep -q "Device does not contain a recognized partition table."); then
-        dialog --ok-label ' Exit ' --msgbox "Looks like disk is empty.\nFormat and mount disk without\npartitions unsupported now." "7" "35"
-        return 1
-    fi
-    if $(echo -e "p\n\nq" | fdisk $diskpath | grep 'Disklabel type:' | grep -q gpt)&&$(echo $mount_ponts | grep -vq bootefi); then
-        mount_ponts="/bootefi $(echo $mount_ponts)"
-    fi
-    part_table_type=$(echo -e "\np\nq" | fdisk $diskpath 2>&1 | grep 'Disklabel type:' | sed 's/.*isklabel type: //g')
-        tmpvar10=""
-        get_scl_sheme "$diskpath" "" >"$1"
-        curr_parts=$(cat "$1" | grep part -c)
-        get_adnf "$diskpath" "" "$1" $part_table_type
-        parts_lst=''
-        for tmp_cycle5 in $(cat "$1" | grep -v free | grep -v "Extended" | sed 's/.*part/part/g' | sed 's/ .*//g'); do
-            parts_lst+=$(echo "$tmp_cycle5"@"$(cat "$1" | grep "$tmp_cycle5" | sed "s/.*$tmp_cycle5 //g" | sed 's/ .*//g')"' ')
+    ## $1 - exitstatus
+    
+    partprobe
+    tmp_menu_cycle00=" "
+    while [ ! -z "$tmp_menu_cycle00" ]; do
+        mount_ponts='/ /boot /bootefi /home /var /tmp /usr'        
+        echo ''>"$1"
+        gsdl "$1" "d"
+        get_avl_diskparts=''
+        for tmp_cycle8 in $(cat $1); do
+            diskpath="/dev/$tmp_cycle8"
+            part_table_type=$(echo -e "\np\nq" | fdisk $diskpath 2>&1 | grep 'Disklabel type:' | sed 's/.*isklabel type: //g')
+            tmpvar10=""
+            get_scl_sheme "$diskpath" "" >"$1"
+            curr_parts=$(cat "$1" | grep part -c)
+            get_adnf "$diskpath" "" "$1" $part_table_type
+            parts_lst=''
+            for tmp_cycle5 in $(cat "$1" | grep -v free | grep -v "Extended" | sed 's/.*part/part/g' | sed 's/ .*//g'); do
+                parts_lst+=$(echo "$tmp_cycle5"@"$(cat "$1" | grep "$tmp_cycle5" | sed "s/.*$tmp_cycle5 //g" | sed 's/ .*//g')"' ')
+            done
+            get_avl_diskparts+="$(echo $parts_lst | sed "s/part/$tmp_cycle8\_part/g") "
         done
-    tmp_menu_cycle01=" "
-    while [ ! -z "$tmp_menu_cycle01" ]; do
-        tmpvar10=$(mk_menu_list "$parts_lst" "" "")
-        tmpvar10=$(echo $tmpvar10 | sed 's/@/ /g')
-        tmpvar10+=" ' Select another disk (discard current)' '' '' ' Discard All changes and exit' '' 'on' ' Write All changes and exit' '' '' "
-        tmpvar10="dialog --no-cancel --radiolist 'Select partition' '' '' '' $tmpvar10 " 
-        tmpvar10+=' 2>"'"$1"'"'
-        eval $tmpvar10
-        if $(cat "$1" | grep -q "/")||$(cat "$1" | grep -q " luks")||$(cat "$1" | grep -q "swap"); then
-            dialog --msgbox "This partition is already in use.\n\nSelect another or discard changes and run script again." '8' '40'
-        elif $(cat "$1" | grep -q "Discard"); then
-            tmp_menu_cycle01=''
-            tmp_menu_cycle00=''
-            parts_lst=''
-            return 0
-        elif $(cat "$1" | grep -q "Write All"); then
-            if ! $(echo $parts_lst | grep -q "@/@"); then
-                dialog --colors --msgbox "\Z1WARNING! No root partition '/' is specified\Zn\n\nWithout rootfs installation by this script will fail on next steps" '' ''
+        parts_lst=$(echo $get_avl_diskparts)
+        # mounted check
+        for tmp_cycle5 in $parts_lst;do
+            tmpvar6767=$(echo $tmp_cycle5 | sed 's/@.*//g')
+            if $(mount | grep -q -e "$(echo $tmpvar6767 | sed 's/_part//g')" -e "$(echo $tmpvar6767 | sed 's/_part/p/g')"); then
+                parts_lst=$(echo $parts_lst | sed "s/$tmp_cycle5//g")
             fi
-            tmp_menu_cycle01=''
-            tmp_menu_cycle00=''
-        elif $(cat "$1" | grep -q "Select another disk"); then
-            tmp_menu_cycle01=''
-            parts_lst=''
-#             dialog --defaultno --yesno 'Do you want to use partitions from other disk(s)?' '6' '35'
-#             if [ $? -ne 0 ]; then tmp_menu_cycle00=''; fi
-        else
-            tune_part=$(cat "$1" | grep part | sed 's/ .*//g')
-            if $(echo $tune_part | grep -q part); then
-                if $(echo $tune_part | grep -vq luks); then
-                    tmpvar10=$(mk_menu_list "$mount_ponts" "" "")
-                    #tmpvar10+=" 'swap' '' '' 'luks' '' '' 'custom' '' '' 'do not use' '' 'on' "
-                    tmpvar10+=" 'swap' '' '' 'custom' '' '' 'do not use' '' 'on' "
-                    tmpvar10=" dialog --no-cancel --radiolist 'How to use a partition?' '' '' '' $tmpvar10 "
-                else
-                    tmpvar10=$(mk_menu_list "$(echo $mount_ponts | sed 's|\/ | |g' | sed 's| \/boot | |g')" "" "")
-                    tmpvar10+=" 'custom' '' '' 'do not use' '' 'on' "
-                    tmpvar10=" dialog --no-cancel --radiolist 'How to use a partition?\n/ and /boot mount points encryption\nis not supported by this script' '' '' '' $tmpvar10 "
+        done
+        tmp_menu_cycle01=" "
+        while [ ! -z "$tmp_menu_cycle01" ]; do
+            tmpvar10=$(mk_menu_list "$parts_lst" "" "")
+            tmpvar10=$(echo $tmpvar10 | sed 's/@/ /g')
+            tmpvar10+=" ' Discard All changes and exit' '' 'on' ' Write All changes and exit' '' '' ' Try unmount all from mnt' '' ''"
+            tmpvar10="dialog --no-cancel --radiolist 'Select partition' '' '' '' $tmpvar10 " 
+            tmpvar10+=' 2>"'"$1"'"'
+            eval $tmpvar10
+            if $(cat "$1" | grep -q "/")||$(cat "$1" | grep -q "swap"); then
+                dialog --msgbox "This partition is already in use.\n\nSelect another or discard changes and run script again." '8' '40'
+            elif $(cat "$1" | grep -q "Discard"); then
+                tmp_menu_cycle01=''
+                tmp_menu_cycle00=''
+                parts_lst=''
+                return 0
+            elif $(cat "$1" | grep -q "Write All"); then
+                if ! $(echo $parts_lst | grep -q "@/@"); then
+                    dialog --colors --msgbox "\Z1WARNING! No root partition '/' is specified\Zn\n\nWithout it mounted to /mnt installation impossible.\n\nTo avoud surprises, nothing will be writed at all" '' ''
                 fi
-                tmpvar10+=' 2>"'"$1"'"'
-                eval $tmpvar10
-                if $(cat "$1" | grep -q bootefi); then
-                    parts_lst=$(echo $parts_lst | sed "s|$tune_part|$tune_part@/bootefi|g")
-                    mount_ponts=$(echo $mount_ponts | sed "s|\/bootefi ||g")
-                    echo ''>$1
-                    dialog  --no-cancel --radiolist 'Format to filesystem' '' '' '' 'fat' 'use when no other OS is installed' '' 'do_not_format' 'use when other OS is already installed' 'on' 2>"$1"
-                    parts_lst=$(echo $parts_lst | sed "s|$tune_part|$tune_part@$(echo $(cat $1))|g")
-#                 if $(cat "$1" | grep -q "do not use"); then
-#                     echo '' >/dev/null
-                elif $(cat "$1" | grep -q custom); then
-                    dialog  --no-cancel --title "Specify a custom mount point" --inputbox "\nDo not use special symbols space and @, otherwise result will be unpredicted.\n And do not use it like /dir1/dir2... currently it is unsupported and could lead to fail. " '12' '44' "/my_dir" 2>"$1"
-                    if $(cat "$1" | grep -vxq "/")&&$(cat "$1" | grep -vxq "/boot"); then
+                tmp_menu_cycle01=''
+                tmp_menu_cycle00=''
+            elif $(cat "$1" | grep -xq " Try unmount all from mnt"); then
+                if $(mount | grep -q '/mnt'); then
+                    if $(mount | grep -q '/mnt/boot/efi'); then
+                        umount /mnt/boot/efi
+                    fi
+                    for tmp_umnt_cycle in $(mount | grep "/mnt/" | sed 's@.*\/mnt/@/mnt@g' | sed 's/ .*//g'); do
+                        umount $tmp_umnt_cycle
+                    done
+                    umount /mnt
+                    tmp_menu_cycle01=''
+                    tmp_menu_cycle00=''
+                    parts_lst=''
+                    return 0
+                fi
+            else
+                tune_part=$(cat "$1" | grep part | sed 's/ .*//g')
+                
+                if $(echo $tune_part | grep -q part); then
+                    tmpvar10=$(mk_menu_list "$mount_ponts" "" "")
+                    tmpvar10+=" 'swap' '' '' 'custom' '' '' 'do not use' '' 'on' "
+                    tmpvar10=" dialog --no-cancel --radiolist 'How to use a partition?\n\nfor BIOS-system / mount point is required\n for UEFI - / and /bootefi are required' '' '' '' $tmpvar10 "
+                    tmpvar10+=' 2>"'"$1"'"'
+                    eval $tmpvar10
+                    if $(cat "$1" | grep -q bootefi); then
+                        parts_lst=$(echo $parts_lst | sed "s|$tune_part|$tune_part@/bootefi|g")
+                        mount_ponts=$(echo $mount_ponts | sed "s|\/bootefi ||g")
+                        echo ''>$1
+                        dialog  --no-cancel --radiolist 'Format to filesystem' '' '' '' 'fat' 'use when no other OS is installed' '' 'do_not_format' 'use when other OS is already installed' 'on' 2>"$1"
+                        parts_lst=$(echo $parts_lst | sed "s|$tune_part|$tune_part@$(echo $(cat $1))|g")
+                    elif $(cat "$1" | grep -q custom); then
+                        dialog  --no-cancel --title "Specify a custom mount point" --inputbox "\nDo not use special symbols space and @, otherwise result will be unpredicted.\n And do not use it like /dir1/dir2... currently it is unsupported and could lead to fail. " '12' '44' "/my_dir" 2>"$1"
+                        if $(cat "$1" | grep -vxq "/")&&$(cat "$1" | grep -vxq "/boot"); then
+                            parts_lst=$(echo $parts_lst | sed "s|$tune_part|$tune_part@$(echo $(cat $1))|g")
+                            mount_ponts=$(echo $mount_ponts | sed "s|$(cat $1) ||g")
+                            dialog  --no-cancel --radiolist 'Format to filesystem' '' '' '' 'ext4' '' '' 'btrfs' '' '' 'f2fs' '' '' 'fat' '' '' 'ntfs' '' '' 'do_not_format' '' 'on' 2>"$1"
+                            parts_lst=$(echo $parts_lst | sed "s|$tune_part|$tune_part@$(echo $(cat $1))|g")
+                        fi
+                        if $(cat "$1" | grep -q "btrfs" ); then
+                            dialog  --no-cancel --radiolist 'Specify compression options for btrfs filesystem.\n\nFilesystem compression could save some space and increase reaction speed of operating system even for SSD, but it require a high (single thread) performance of CPU ' '' '' '' 'zlib' 'default, slow' '' 'zlib:9' 'high compr., very slow' '' 'zstd' 'much faster decompr.' '' 'zstd:13' 'high compression' '' 'do_not_compress' '' 'on' 2>"$1"
+                            parts_lst=$(echo $parts_lst | sed "s|$tune_part|$tune_part@$(echo $(cat $1))|g")
+                            
+                        fi
+                        if $(cat "$1" | grep -q "f2fs" ); then
+                            dialog  --colors --no-cancel --checklist 'f2fs provides some functionality, but these must be applied at formatting time.' '' '' '' 'encrypt' 'supp. for fs level encryption' '' 'extra_attr' 'extra attr feature' '' 'project_quota' 'project ID tracking' '' 'inode_checksum' 'inode checksum' '' 'flexible_inline_xattr' 'flexible inline xattr' '' 'quota' 'quotas' '' 'inode_crtime' 'inode creation time' '' 'lost_found' 'lost+found' '' 'sb_checksum' 'superblock checksum' '' 'casefold' 'casefolding  supp.; opt. flags can be passed with -C' '' 'compression' 'sup. for fs level compression' '' 2>"$1"
+                            if $(cat $1 | grep -e 'project_quota' -e 'inode_checksum' -e 'flexible_inline_xattr' -e 'inode_crtime' -e 'compression' -q ) && $(cat $1 | grep -vq extra_attr); then 
+                                tmpvar23="extra_attr "
+                                tmpvar23+=$(echo $(cat "$1"))
+                                echo $tmpvar23',' > "$1"
+                                tmpvar23=$(echo $(cat "$1") | sed 's/ /,/g')
+                                echo $tmpvar23 > "$1"
+                            elif [ "$(cat $1)" == "" ]; then
+                                tmpvar23=''
+                            else
+                                tmpvar23=$(echo $(cat "$1")',')
+                                echo $(echo $tmpvar23) | sed 's/ /,/g'> "$1"
+                            fi
+                            parts_lst=$(echo $parts_lst | sed "s|$tune_part|$tune_part@$(echo $(cat $1))|g")
+                        fi
+                    elif $(cat "$1" | grep -q swap); then
+                        parts_lst=$(echo $parts_lst | sed "s|$tune_part|$tune_part@swap|g")
+                    elif $(cat "$1" | grep -q "/" ); then
                         parts_lst=$(echo $parts_lst | sed "s|$tune_part|$tune_part@$(echo $(cat $1))|g")
                         mount_ponts=$(echo $mount_ponts | sed "s|$(cat $1) ||g")
-                        dialog  --no-cancel --radiolist 'Format to filesystem' '' '' '' 'ext4' '' '' 'btrfs' '' '' 'f2fs' '' '' 'fat' '' '' 'ntfs' '' '' 'do_not_format' '' 'on' 2>"$1"
+                        dialog  --no-cancel --radiolist 'Format to filesystem' '' '' '' 'ext4' 'HDD,SSD,pendrive' '' 'btrfs' 'HDD,SSD,pendrive' '' 'f2fs' 'SSD,pendrive' '' 'do_not_format' '' 'on' 2>"$1"
                         parts_lst=$(echo $parts_lst | sed "s|$tune_part|$tune_part@$(echo $(cat $1))|g")
-                    fi
-                    if $(cat "$1" | grep -q "btrfs" ); then
-                        dialog  --no-cancel --radiolist 'Specify compression options for btrfs filesystem.\n\nFilesystem compression could save some space and increase reaction speed of operating system even for SSD, but it require a high (single thread) performance of CPU ' '' '' '' 'zlib' 'default, slow' '' 'zlib:9' 'high compr., very slow' '' 'zstd' 'much faster decompr.' '' 'zstd:13' 'high compression' '' 'do_not_compress' '' 'on' 2>"$1"
-                        parts_lst=$(echo $parts_lst | sed "s|$tune_part|$tune_part@$(echo $(cat $1))|g")
-                
-                    fi
-                    if $(cat "$1" | grep -q "f2fs" ); then
-                        dialog  --colors --no-cancel --checklist 'f2fs provides some functionality, but these must be applied at formatting time.' '' '' '' 'encrypt' 'supp. for fs level encryption' '' 'extra_attr' 'extra attr feature' '' 'project_quota' 'project ID tracking' '' 'inode_checksum' 'inode checksum' '' 'flexible_inline_xattr' 'flexible inline xattr' '' 'quota' 'quotas' '' 'inode_crtime' 'inode creation time' '' 'lost_found' 'lost+found' '' 'sb_checksum' 'superblock checksum' '' 'casefold' 'casefolding  supp.; opt. flags can be passed with -C' '' 'compression' 'sup. for fs level compression' '' 2>"$1"
-                        if $(cat $1 | grep -e 'project_quota' -e 'inode_checksum' -e 'flexible_inline_xattr' -e 'inode_crtime' -e 'compression' -q ) && $(cat $1 | grep -vq extra_attr); then 
-                            tmpvar23="extra_attr "
-                            tmpvar23+=$(echo $(cat "$1"))
-                            echo $tmpvar23',' > "$1"
-                            tmpvar23=$(echo $(cat "$1") | sed 's/ /,/g')
-                            echo $tmpvar23 > "$1"
-                        elif [ "$(cat $1)" == "" ]; then
-                            tmpvar23=''
-                        else
-                            tmpvar23=$(echo $(cat "$1")',')
-                            echo $(echo $tmpvar23) | sed 's/ /,/g'> "$1"
+                        if $(cat "$1" | grep -q "btrfs" ); then
+                            dialog  --no-cancel --radiolist 'Specify compression options for btrfs filesystem.\n\nFilesystem compression could save some space and increase reaction speed of operating system even for SSD, but it require a high (single thread) performance of CPU ' '' '' '' 'zlib' 'default, slow' '' 'zlib:9' 'high compr., very slow' '' 'zstd' 'much faster decompr.' '' 'zstd:13' 'high compression' '' 'do_not_compress' '' 'on' 2>"$1"
+                            parts_lst=$(echo $parts_lst | sed "s|$tune_part|$tune_part@$(echo $(cat $1))|g")
                         fi
-                        parts_lst=$(echo $parts_lst | sed "s|$tune_part|$tune_part@$(echo $(cat $1))|g")
-                    fi
-                elif $(cat "$1" | grep -xq luks)&&$(echo $tune_part | grep -vq luks); then
-                    if [ ! -s "$luks_tests" ]; then
-                        clear
-                        echo wait 10-30 sec. for crypt tests ends
-                        cryptsetup benchmark > "$luks_tests"
-                        cat "$luks_tests"
-                        read -n 1 -s -r -p "Press any key to continue"
-                    fi
-                    tmpvar10=$(mk_menu_list "$(echo $(cat "$luks_tests" | grep PBKDF2 | sed 's/PBKDF2-//g' | sed 's/ .*//g'))" "on" "1")
-                    tmpvar10=" dialog --no-cancel --radiolist 'Select hash algorithm' '' '' '' $tmpvar10 " 
-                    tmpvar10+=' 2>"'"$1"'"'
-                    eval $tmpvar10
-                    tmpluksvar="@hash="$(cat "$1")"@"
-                    tmpvar10=$(mk_menu_list "$(echo $(tail -n +$(($(cat "$luks_tests" | grep Algorithm -n | sed 's/:.*//g')+1)) "$luks_tests" | sed 's/ /@/g' | sed 's/b@.*/b/g' | sed 's/@@/@/g' | sed 's/@@/@/g' | sed 's/@@/@/g'))" "on" "1")
-                    tmpvar10=" dialog --no-cancel --radiolist 'Select hash algorithm' '' '' '' $tmpvar10 " 
-                    tmpvar10=$(echo $tmpvar10 | sed 's/@/ /g')
-                    tmpvar10+=' 2>"'"$1"'"'
-                    eval $tmpvar10
-                    tmpluksvar+="@"$(cat "$1" | sed 's/ /@/g')'@'
-                    #spc encryptor
-                    parts_lst=$(echo $parts_lst | sed "s|$tune_part|$tune_part@luks$tmpluksvar|g")
-                    parts_lst+=" ""$tune_part""luks"
-                elif $(cat "$1" | grep -q swap); then
-                    ## due to risks swap encryption isn't included
-                    parts_lst=$(echo $parts_lst | sed "s|$tune_part|$tune_part@swap|g")
-                elif $(cat "$1" | grep -q "/" ); then
-                    parts_lst=$(echo $parts_lst | sed "s|$tune_part|$tune_part@$(echo $(cat $1))|g")
-                    mount_ponts=$(echo $mount_ponts | sed "s|$(cat $1) ||g")
-                    dialog  --no-cancel --radiolist 'Format to filesystem' '' '' '' 'ext4' 'HDD,SSD,pendrive' '' 'btrfs' 'HDD,SSD,pendrive' '' 'f2fs' 'SSD,pendrive' '' 'do_not_format' '' 'on' 2>"$1"
-                    parts_lst=$(echo $parts_lst | sed "s|$tune_part|$tune_part@$(echo $(cat $1))|g")
-                    if $(cat "$1" | grep -q "btrfs" ); then
-                        dialog  --no-cancel --radiolist 'Specify compression options for btrfs filesystem.\n\nFilesystem compression could save some space and increase reaction speed of operating system even for SSD, but it require a high (single thread) performance of CPU ' '' '' '' 'zlib' 'default, slow' '' 'zlib:9' 'high compr., very slow' '' 'zstd' 'much faster decompr.' '' 'zstd:13' 'high compression' '' 'do_not_compress' '' 'on' 2>"$1"
-                        parts_lst=$(echo $parts_lst | sed "s|$tune_part|$tune_part@$(echo $(cat $1))|g")
-                    fi
-                    
-                    if $(cat "$1" | grep -q "f2fs" ); then
-                        dialog  --colors --no-cancel --checklist 'f2fs provides some functionality, but these must be applied at formatting time.' '' '' '' 'encrypt' 'supp. for fs level encryption' '' 'extra_attr' 'extra attr feature' '' 'project_quota' 'project ID tracking' '' 'inode_checksum' 'inode checksum' '' 'flexible_inline_xattr' 'flexible inline xattr' '' 'quota' 'quotas' '' 'inode_crtime' 'inode creation time' '' 'lost_found' 'lost+found' '' 'sb_checksum' 'superblock checksum' '' 'casefold' 'casefolding  supp.; opt. flags can be passed with -C' '' 'compression' 'sup. for fs level compression' '' 2>"$1"
-                        if $(cat $1 | grep -e 'project_quota' -e 'inode_checksum' -e 'flexible_inline_xattr' -e 'inode_crtime' -e 'compression' -q ) && $(cat $1 | grep -vq extra_attr); then 
-                            tmpvar23="extra_attr "
-                            tmpvar23+=$(echo $(cat "$1"))
-                            echo $tmpvar23',' > "$1"
-                            tmpvar23=$(echo $(cat "$1") | sed 's/ /,/g')
-                            echo $tmpvar23 > "$1"
-                        elif [ "$(cat $1)" == "" ]; then
-                            tmpvar23=''
-                        else
-                            tmpvar23=$(echo $(cat "$1")',')
-                            echo $(echo $tmpvar23) | sed 's/ /,/g'> "$1"
+                        
+                        if $(cat "$1" | grep -q "f2fs" ); then
+                            dialog  --colors --no-cancel --checklist 'f2fs provides some functionality, but these must be applied at formatting time.' '' '' '' 'encrypt' 'supp. for fs level encryption' '' 'extra_attr' 'extra attr feature' '' 'project_quota' 'project ID tracking' '' 'inode_checksum' 'inode checksum' '' 'flexible_inline_xattr' 'flexible inline xattr' '' 'quota' 'quotas' '' 'inode_crtime' 'inode creation time' '' 'lost_found' 'lost+found' '' 'sb_checksum' 'superblock checksum' '' 'casefold' 'casefolding  supp.; opt. flags can be passed with -C' '' 'compression' 'sup. for fs level compression' '' 2>"$1"
+                            if $(cat $1 | grep -e 'project_quota' -e 'inode_checksum' -e 'flexible_inline_xattr' -e 'inode_crtime' -e 'compression' -q ) && $(cat $1 | grep -vq extra_attr); then 
+                                tmpvar23="extra_attr "
+                                tmpvar23+=$(echo $(cat "$1"))
+                                echo $tmpvar23',' > "$1"
+                                tmpvar23=$(echo $(cat "$1") | sed 's/ /,/g')
+                                echo $tmpvar23 > "$1"
+                            elif [ "$(cat $1)" == "" ]; then
+                                tmpvar23=''
+                            else
+                                tmpvar23=$(echo $(cat "$1")',')
+                                echo $(echo $tmpvar23) | sed 's/ /,/g'> "$1"
+                            fi
+                            parts_lst=$(echo $parts_lst | sed "s|$tune_part|$tune_part@$(echo $(cat $1))|g")
                         fi
-                        parts_lst=$(echo $parts_lst | sed "s|$tune_part|$tune_part@$(echo $(cat $1))|g")
                     fi
                 fi
             fi
-        fi
+        done
     done
-done
-## find rootfs
-if $(echo $diskpath | grep -q -e 'mmc' -e 'nvme'); then
-    diskpartmask=p
-else
-    diskpartmask=''
-fi
-for tmp_cycle6 in $parts_lst; do
-    if $(echo $tmp_cycle6 | grep -q "@/@"); then
-        clear
-        ft_n_mt "$tmp_cycle6" "$diskpath""$diskpartmask"
-        tmp_parts_lst=$(echo $parts_lst | sed "s|$tmp_cycle6||g")
-    fi
-done
-## if boot and bootefi existed make boot first
-if $(echo $tmp_parts_lst | grep -q "@/boot@")&&$(echo $tmp_parts_lst | grep -q "@/bootefi@"); then
-    parts_lst=$tmp_parts_lst
+    ## find rootfs
     for tmp_cycle6 in $parts_lst; do
-        if $(echo $tmp_cycle6 | grep -q "@/boot@"); then
-            ft_n_mt "$tmp_cycle6" "$diskpath""$diskpartmask"
-            tmp_parts_lst=$(echo $parts_lst | sed "s|$tmp_cycle6 ||g")
+        diskpath="/dev/$(echo $tmp_cycle6 | sed 's/_part.*//g')"
+        if $(echo $tmp_cycle6 | grep -q -e 'mmc' -e 'nvme'); then
+            diskpartmask=p
+        else
+            diskpartmask=''
+        fi
+        if $(echo $tmp_cycle6 | grep -q "@/@"); then
+            clear
+            ft_n_mt "$(echo $tmp_cycle6 | sed 's/.*part/part/g')" "$diskpath""$diskpartmask" |& tee -a install.log
+            tmp_parts_lst=$(echo $parts_lst | sed "s|$tmp_cycle6||g")
         fi
     done
-fi
-## process other partitions
-tmp_parts_lst_luks=$tmp_parts_lst
-for tmp_cycle6 in $tmp_parts_lst; do
-    if $(echo $tmp_cycle6 | grep -vq "luks"); then
-        ft_n_mt "$tmp_cycle6" "$diskpath""$diskpartmask"
-        tmp_parts_lst_luks=$(echo $tmp_parts_lst_luks | sed "s|$tmp_cycle6 ||g")
+    ## if boot and bootefi existed make boot first
+    if $(echo $tmp_parts_lst | grep -q "@/boot@")&&$(echo $tmp_parts_lst | grep -q "@/bootefi@"); then
+        parts_lst=$tmp_parts_lst
+        for tmp_cycle6 in $parts_lst; do
+            diskpath="/dev/$(echo $tmp_cycle6 | sed 's/_part.*//g')"
+            if $(echo $tmp_cycle6 | grep -q -e 'mmc' -e 'nvme'); then
+                diskpartmask=p
+            else
+                diskpartmask=''
+            fi
+            if $(echo $tmp_cycle6 | grep -q "@/boot@"); then
+                ft_n_mt "$(echo $tmp_cycle6 | sed 's/.*part/part/g')" "$diskpath""$diskpartmask" |& tee -a install.log
+                tmp_parts_lst=$(echo $parts_lst | sed "s|$tmp_cycle6||g")
+            fi
+        done
     fi
-done
-
-#rm -f $luks_tests
+    ## process other partitions
+    for tmp_cycle6 in $tmp_parts_lst; do
+        diskpath="/dev/$(echo $tmp_cycle6 | sed 's/_part.*//g')"
+        if $(echo $tmp_cycle6 | grep -q -e 'mmc' -e 'nvme'); then
+            diskpartmask=p
+        else
+            diskpartmask=''
+        fi
+        ft_n_mt "$(echo $tmp_cycle6 | sed 's/.*part/part/g')" "$diskpath""$diskpartmask" |& tee -a install.log
+    done
 }
 
 ## ---------------------- ##
@@ -977,30 +1237,23 @@ f-ecf(){
 ## ---------------------- ##
 
 runchr(){
-## $1 - exitstatusfile
-cp -f $1 /mnt/$1
-echo '
+    ## $1 - exitstatusfile
+    cp -f $1 /mnt/$1
+    echo '
 exit' >>/mnt/st2run
-chmod +x /mnt/st2run
-arch-chroot /mnt ./st2run
+    chmod +x /mnt/st2run
+    arch-chroot /mnt ./st2run
 }
 
 ## ---------------------- ##
 ## next internal function ##
 ## ---------------------- ##
 
-step1(){
-## select pkgs and install system
-## $1 - exitstatusfile
-
-pacman -Sy --noconfirm
-if [ -f ignored.txt ]; then rm -f ignored.txt; fi
-
-## add a custom selected packages
-dialog --defaultno --no-label " Skip it " --yesno 'You may add some packages to batch-list. Do you want to do it?' '' ''
-if [ $? -ne 1 ]; then
-    dialog --msgbox 'This is a very primitive packages selector. All it can do is add the selected package to the batch list. That is it. The packages are grouped in the same way as in the pacman database.' '' ''
-
+simple_pkg_add(){
+    ## add a custom selected packages
+    
+    #dialog --msgbox 'This is a very primitive packages selector. All it can do is add the selected package to the batch list. That is it. The packages are grouped in the same way as in the pacman database.' '' ''
+    
     paclist=$(mktemp XXXXXX.tmp)
     menustatus=$(mktemp XXXXXX.tmp)
     repo_groups=$(mktemp XXXXXXX.tmp)
@@ -1013,14 +1266,14 @@ if [ $? -ne 1 ]; then
         dialog --colors --title '\Z1Package selector fail' --msgbox '\nAdditional package could be installed after sytem installation complete.\Zn' '7' '45'
         rm -f $menustatus $repo_groups $red_rgroups $paclist
     else
-    
+        
         tmpmenuvar242='dialog --nocancel --checklist "Select repo to search" "" "" "" '
         tmpmenuvar242+=$(mk_menu_list "core extra community" "on" "")
         tmpmenuvar242+=' 2>"'"$menustatus"'"'
         eval $tmpmenuvar242
-    
+        
         cat $paclist | grep [$(cat $menustatus | sed 's/ /,/g')][/] | grep "(" | sed 's/.*(//g' | sed 's/).*//g' >$repo_groups
-    
+        
         echo ''>$red_rgroups
         for ((tmpcycle57=1;$tmpcycle57 <= "$(wc -l $repo_groups | sed 's/ .*//g')";tmpcycle57++)); do
             tmpvariable3495="$(head -n $tmpcycle57 $repo_groups | tail -n 1 | sed 's/ /@/g')"
@@ -1029,7 +1282,7 @@ if [ $? -ne 1 ]; then
                 echo "$tmpvariable3495"
             fi
         done
-   
+        
         endselector=0
         while [ $endselector -ne 1 ]; do
             tmpmenuvar242='dialog --nocancel --radiolist "Select a groupe of packages or a searchbox" "" "" "" '
@@ -1064,35 +1317,41 @@ if [ $? -ne 1 ]; then
         
         rm -f $menustatus $repo_groups $red_rgroups $paclist
     fi
-fi
+}
 
-echo ''>$1
-echo checking pkg availability
-tmp_max_thrd=$(($(grep "model name" /proc/cpuinfo --count)+1))
-tmp_thrd_count=0
-for i in $(cat "$batchlist" | grep -vx "$(pacman -Qqe)"); do
-    #$0 pkg_chk $i "$1" &
-    pkg_chk "$i" "$1" &
-    tmp_thrd_count=$(($tmp_thrd_count+1))
-    printf "."
-    if [ $tmp_thrd_count -eq $tmp_max_thrd ]; then
-        tmp_thrd_count=0
-        wait
-    fi        
-done
-wait
-cp -f $1 $batchlist
+## ---------------------- ##
+## next internal function ##
+## ---------------------- ##
 
-if [ -e ignored.txt ];then
-    dialog --colors --title 'Unavailable packages' --msgbox "\n$(echo $(cat ignored.txt)) \n\n\ZbIt seems the 'batchlist' a little bit outdated.\nYou can install alternatives manually or try without them.\Zn" '' ''
-    cp -f ignored.txt /mnt/ignored.txt
-    clear
-fi
-cp -f $batchlist /mnt/$batchlist
-
-## batch installation
-pacstrap /mnt base $(echo $(cat $batchlist))
-genfstab -U /mnt >> /mnt/etc/fstab
+chk_pk_avl(){
+    ## checking packages availability
+    ## $1 - exitstatusfile
+    
+    pacman -Sy --noconfirm
+    if [ -f ignored.txt ]; then rm -f ignored.txt; fi
+    
+    echo ''>$1
+    echo checking pkg availability
+    tmp_max_thrd=$(($(grep "model name" /proc/cpuinfo --count)+1))
+    tmp_thrd_count=0
+    for i in $(cat "$batchlist" | grep -vx "$(pacman -Qqe)"); do
+        #$0 pkg_chk $i "$1" &
+        pkg_chk "$i" "$1" &
+        tmp_thrd_count=$(($tmp_thrd_count+1))
+        printf "."
+        if [ $tmp_thrd_count -eq $tmp_max_thrd ]; then
+            tmp_thrd_count=0
+            wait
+        fi        
+    done
+    wait
+    cp -f $1 $batchlist
+    
+    if [ -e ignored.txt ];then
+        dialog --colors --title 'Unavailable packages' --msgbox "\n$(echo $(cat ignored.txt)) \n\n\ZbIt seems the 'batchlist' a little bit outdated.\nYou can install alternatives manually or try without them.\Zn" '' ''
+        cp -f ignored.txt /mnt/ignored.txt
+        clear
+    fi
 }
 
 ## ---------------------- ##
@@ -1100,28 +1359,42 @@ genfstab -U /mnt >> /mnt/etc/fstab
 ## ---------------------- ##
 
 
-step2(){
-## tune system
-## $1 - exitstatusfile
+install_pk(){
 
-echo ''>$1
-dialog  --no-cancel --inputbox "Specify a hostname" '' '' "test" 2>"$1"
-echo $(cat $1) > /mnt/etc/hostname
+    cp -f $batchlist /mnt/$batchlist
+    
+    ## batch installation
+    pacstrap /mnt base $(echo $(cat $batchlist))
+    genfstab -U /mnt >> /mnt/etc/fstab
+}
 
-echo ''>$1
-tmpvar01='dialog --no-cancel --radiolist "Select timezone" "" "" "" '
-tmpvar01+=$(mk_menu_list "$(echo $(find /mnt/usr/share/zoneinfo/ | sed 's|.*zoneinfo\/||g' | grep -v right| grep -v 'posix/' | grep "[A-Z]"))" "" "")
-tmpvar01+=' 2>"'"$1"'"'
-eval $tmpvar01
-if [ -f /mnt/etc/localtime ]; then rm -r /mnt/etc/localtime; fi
-ln -s /usr/share/zoneinfo/$(cat $1) /mnt/etc/localtime
-echo ''>$1
-tmpvar01='dialog --no-cancel --checklist "Select locales" "" "" "" '
-tmpvar01+='"en_US.UTF-8@UTF-8" "" "on" "uk_UA.UTF-8@UTF-8" "" "" "ru_RU.UTF-8@UTF-8" "" "" '
-tmpvar01+=$(mk_menu_list "$(echo $(cat /mnt/etc/locale.gen | grep "#[a-z,A-Z]" | sed 's/#//g' | sed 's/ /@/g' | sed 's/@@//g'))" "" "")
-tmpvar01+=' 2>"'"$1"'"'
-eval $tmpvar01
-echo 'tmpvar22=""
+## ---------------------- ##
+## next internal function ##
+## ---------------------- ##
+
+
+set_hlt(){
+    ## set hostname locales timezone
+    ## $1 - exitstatusfile
+    
+    echo ''>$1
+    dialog  --no-cancel --inputbox "Specify a hostname" '' '' "test" 2>"$1"
+    echo $(cat $1) > /mnt/etc/hostname
+    
+    echo ''>$1
+    tmpvar01='dialog --no-cancel --radiolist "Select timezone" "" "" "" '
+    tmpvar01+=$(mk_menu_list "$(echo $(find /mnt/usr/share/zoneinfo/ | sed 's|.*zoneinfo\/||g' | grep -v right| grep -v 'posix/' | grep "[A-Z]"))" "" "")
+    tmpvar01+=' 2>"'"$1"'"'
+    eval $tmpvar01
+    if [ -f /mnt/etc/localtime ]; then rm -r /mnt/etc/localtime; fi
+    ln -s /usr/share/zoneinfo/$(cat $1) /mnt/etc/localtime
+    echo ''>$1
+    tmpvar01='dialog --no-cancel --checklist "Select locales" "" "" "" '
+    tmpvar01+='"en_US.UTF-8@UTF-8" "" "on" "uk_UA.UTF-8@UTF-8" "" "" "ru_RU.UTF-8@UTF-8" "" "" '
+    tmpvar01+=$(mk_menu_list "$(echo $(cat /mnt/etc/locale.gen | grep "#[a-z,A-Z]" | sed 's/#//g' | sed 's/ /@/g' | sed 's/@@//g'))" "" "")
+    tmpvar01+=' 2>"'"$1"'"'
+    eval $tmpvar01
+    echo 'tmpvar22=""
 for i in $(cat "'$1'"); do
     tmpvar22=$(echo $i | sed "s/@/ /g")
     if $(cat /etc/locale.gen | grep -q "$tmpvar22" ); then
@@ -1131,108 +1404,85 @@ for i in $(cat "'$1'"); do
     fi
 done
 locale-gen' >/mnt/st2run
-clear
-runchr "$1"
+    clear
+    runchr "$1" |& tee -a /mnt/install.log
+}
 
-dialog  --no-cancel --inputbox "Specify a user name" '' '' "user" 2>"$1"
-clear
-user_name=$(cat "$1")
-echo 'user_name='$user_name'
-useradd -m -g users -s /bin/bash $user_name' >/mnt/st2run
-runchr "$1"
+## ---------------------- ##
+## next internal function ##
+## ---------------------- ##
 
-dialog --colors --msgbox '\Z1This script does not ask for your password.\n\nYou will be forced to enter the password directly to passwd.\Zn' '9' '35'
-echo 'clear
+set_users(){
+    ## add users
+    ## $1 - exitstatusfile
+    tmpvar25=1
+    while [ "$tmpvar25" -gt 0 ]; do
+        dialog  --no-cancel --inputbox "Specify a user name" '' '' "user" 2>"$1"
+        user_name=$(cat "$1")
+        dialog  --no-cancel --inputbox "Yoy can mod useradd string" '' '' "useradd -m -g users -s /bin/bash $user_name" 2>"$1"
+        useraddstring=$(cat "$1")
+        echo "$useraddstring" >/mnt/st2run
+        runchr "$1" |& tee -a /mnt/install.log
+        dialog --colors --msgbox '\Z1This script does not ask for your password.\n\nYou will be forced to enter the password directly to passwd.\Zn' '9' '35'
+        echo 'clear
 echo "enter a new password for user:" '$user_name'
 passwd '$user_name'' >/mnt/st2run
-runchr "$1"
-
-echo ''> "$1"
-tmpmenuvar256=$(mktemp /tmp/XXXXXXX.tmp)
-dialog --nocancel --checklist 'Select tasks to perform' '' '' '' \
-"01" "add '$user_name' to sys group" "on" \
-"02" "add '$user_name' to wheel group" "on" \
-"03" "add '$user_name' to optical group" "on" \
-"04" "add '$user_name' to lp group" "on" \
-"05" "add '$user_name' to SUDO" "on" \
-"06" "disable dhcpcd enable networkmanager/wicd" "on" \
-"07" "enable sddm/lxdm" "on" \
-"08" "enable cups when installed" "on" \
-"09" "set ua-lang and uniCyr-font for console" "" \
-"10" "add en uk ru layouts to xkeyboard" "" \
-"11" "enable smp makepkg" "on" \
-"12" "enable mtune=native as default" "" \
-"13" "add multithreads compression for make pkg" "on" \
-"14" "add zswap to grub default" "on" \
-"15" "change grub colors" "on" \
-"16" "add drivers to initrd" "on" \
-"17" "change hooks" "on" \
-"18" "enable colors for pacman" "on" \
-"19" "set hw clock to localtime" "" \
-"20" "disable tmp in ram" "" \
-"21" "set all usb dev int affinity to 1 cpu core" "" \
-"22" "disable root" "on" \
-"23" "disable avahi-daemon.service" "" \
-"24" "disable lvm2-services" "" \
-"25" "disable systemd-journald.service" "" \
-"26" "enable pacman parallel downloads" "on" \
-"27" "enable system-d DNS-cache" "" \
-"28" "fix silent boot at grub" "on" \
-"29" "disable audit at grub" "" 2>"$tmpmenuvar256"
-clear
-
-if $(cat "$tmpmenuvar256" | grep -q "01"); then
-    echo "gpasswd -a $user_name sys" >/mnt/st2run
-    runchr "$1"
-fi
-if $(cat "$tmpmenuvar256" | grep -q "02"); then
-    echo "gpasswd -a $user_name wheel" >/mnt/st2run
-    runchr "$1"
-fi
-if $(cat "$tmpmenuvar256" | grep -q "03"); then
-    echo "gpasswd -a $user_name optical" >/mnt/st2run
-    runchr "$1"
-fi
-if $(cat "$tmpmenuvar256" | grep -q "04"); then
-    echo "gpasswd -a $user_name lp" >/mnt/st2run
-    runchr "$1"
-fi
-if $(cat "$tmpmenuvar256" | grep -q "05")&&[ -f /mnt/etc/sudoers ]; then
-    echo "echo $user_name' ALL=(ALL) ALL'>> /etc/sudoers" >/mnt/st2run
-    runchr "$1"
-fi
-if $(cat "$tmpmenuvar256" | grep -q "06"); then
-    echo 'if [ -f /usr/lib/systemd/system/NetworkManager.service ]; then
-        systemctl disable dhcpcd 
-        systemctl enable NetworkManager.service
-    elif [ -f /usr/lib/systemd/system/wicd.service ]; then
-        systemctl enable wicd.service
-    fi' >/mnt/st2run
-    runchr "$1"
-fi
-if $(cat "$tmpmenuvar256" | grep -q "07"); then
-    echo 'if [ -f /usr/lib/systemd/system/sddm.service ]; then
-        systemctl enable sddm.service
-    elif [ -f /usr/lib/systemd/system/lxdm.service ]; then
-        systemctl enable lxdm.service
-    fi' >/mnt/st2run
-    runchr "$1"
-fi
-if $(cat "$tmpmenuvar256" | grep -q "08")&&[ -f /mnt/usr/lib/systemd/system/org.cups.cupsd.service ]; then
-    echo 'systemctl enable org.cups.cupsd.service' >/mnt/st2run
-    runchr "$1"
-fi
-if $(cat "$tmpmenuvar256" | grep -q "09"); then
-    echo '#LANG="en_US.UTF-8" 
+        runchr "$1"
+        
+        echo ''> "$1"
+        tmpmenuvar256=$(mktemp /tmp/XXXXXXX.tmp)
+        dialog --nocancel --checklist 'Select tasks to perform' '' '' '' \
+"1" "add '$user_name' to sys group" "on" \
+"2" "add '$user_name' to wheel group" "on" \
+"3" "add '$user_name' to sudo group" "" \
+"4" "add '$user_name' to optical group" "on" \
+"5" "add '$user_name' to lp group" "on" \
+"6" "add '$user_name' to sudoers" "" \
+"7" "let '$user_name' run 'sudo systemctl poweroff' " "" \
+"8" "set ua-lang and uniCyr-font for console" "" \
+"9" "add en uk ru layouts to xkeyboard" "" \
+2>"$tmpmenuvar256"
+        clear
+        if $(cat "$tmpmenuvar256" | grep -q "1"); then
+            echo -e "groupadd sudo \ngpasswd -a $user_name sys" >/mnt/st2run
+            runchr "$1" |& tee -a /mnt/install.log
+        fi
+        if $(cat "$tmpmenuvar256" | grep -q "2"); then
+            echo "gpasswd -a $user_name wheel" >/mnt/st2run
+            runchr "$1" |& tee -a /mnt/install.log
+        fi
+        if $(cat "$tmpmenuvar256" | grep -q "3"); then
+            echo "gpasswd -a $user_name sudo" >/mnt/st2run
+            runchr "$1" |& tee -a /mnt/install.log
+        fi
+        if $(cat "$tmpmenuvar256" | grep -q "4"); then
+            echo "gpasswd -a $user_name optical" >/mnt/st2run
+            runchr "$1" |& tee -a /mnt/install.log
+        fi
+        if $(cat "$tmpmenuvar256" | grep -q "5"); then
+            echo "gpasswd -a $user_name lp" >/mnt/st2run
+            runchr "$1" |& tee -a /mnt/install.log
+        fi
+        if $(cat "$tmpmenuvar256" | grep -q "6")&&[ -f /mnt/etc/sudoers ]; then
+            echo "echo $user_name' ALL=(ALL) ALL'>> /etc/sudoers" >/mnt/st2run
+            runchr "$1" |& tee -a /mnt/install.log
+        fi
+        if $(cat "$tmpmenuvar256" | grep -q "7")&&[ -f /mnt/etc/sudoers ]; then
+            echo "" >>/mnt/etc/sudoers
+            echo "$user_name $(echo $(cat /mnt/etc/hostname)) =NOPASSWD: /usr/bin/systemctl poweroff,/usr/bin/systemctl halt,/usr/bin/systemctl reboot,/usr/bin/systemctl suspend,/usr/bin/systemctl hibernate" >>/mnt/etc/sudoers
+        fi
+        if $(cat "$tmpmenuvar256" | grep -q "8"); then
+            if [ ! -d /mnt/home/$user_name/.config ]; then mkdir /mnt/home/$user_name/.config; fi
+            echo '#LANG="en_US.UTF-8" 
 LANG="uk_UA.UTF-8" 
-#LANG="ru_RU.UTF-8" ' > /mnt/etc/locale.conf
-    echo 'KEYMAP=us
+#LANG="ru_RU.UTF-8" ' > /mnt/home/$user_name/.config/locale.conf
+        echo 'KEYMAP=us
 #KEYMAP_TOGGLE=ua
 FONT=UniCyr_8x16' > /mnt/etc/vconsole.conf
-fi
-if $(cat "$tmpmenuvar256" | grep -q "10"); then
-if [ ! -d /mnt/home/$user_name/.config ]; then mkdir /mnt/home/$user_name/.config; fi
-cat<<EOF>/mnt/home/$user_name/.config/kxkbrc
+        fi
+        if $(cat "$tmpmenuvar256" | grep -q "9"); then
+            if [ ! -d /mnt/home/$user_name/.config ]; then mkdir /mnt/home/$user_name/.config; fi
+            cat<<EOF>/mnt/home/$user_name/.config/kxkbrc
 [Layout]
 DisplayNames=,,
 LayoutList=us,ua,ru
@@ -1247,55 +1497,248 @@ ShowSingle=false
 SwitchMode=Global
 Use=true
 EOF
+        fi
+        echo "chown -R $user_name /home/$user_name" > /mnt/st2run
+        runchr "$1" |& tee -a /mnt/install.log
+        
+        dialog --defaultno --yesno "Do you whant to encrypt '$user_name' home folder with ecryptfs?\n\nThis is not a recommended action." '' ''
+        if [ $? -eq 0 ]; then
+            modprobe ecryptfs
+            echo '
+            auth_conf_file='/etc/pam.d/system-auth'
+            
+            if $(pacman -Ss lsof | grep -vq installed); then pacman -S lsof --noconfirm --needed; fi
+            if $(pacman -Ss rsync | grep -vq installed); then pacman -S rsync --noconfirm --needed; fi
+            if $(pacman -Ss which | grep -vq installed); then pacman -S which --noconfirm --needed; fi
+            if $(pacman -Ss ecryptfs-utils | grep -vq installed); then pacman -S ecryptfs-utils --noconfirm --needed; fi
+            
+            if [ ! -f "$auth_conf_file".orig ]; then 
+                cp "$auth_conf_file" "$auth_conf_file".orig
+                
+                if $(cat "$auth_conf_file" | sed "s/ //g" | grep -q "authrequiredpam_unix.so"); then
+                    cutlinenamber=$(cat "$auth_conf_file" | sed "s/ //g" | grep "authrequiredpam_unix.so" -n | sed "s/:.*//g")
+                    head -n $cutlinenamber "$auth_conf_file" >"$auth_conf_file".tmp
+                    echo "auth       [success=1 default=ignore]  pam_succeed_if.so service = systemd-user quiet
+auth       required                    pam_ecryptfs.so unwrap" >> "$auth_conf_file".tmp
+                    tail -n +$(($cutlinenamber+1)) "$auth_conf_file" >> "$auth_conf_file".tmp
+                    mv -f "$auth_conf_file".tmp "$auth_conf_file"
+                elif $(cat "$auth_conf_file" | sed "s/ //g" | grep -q "auth\[default=die\]pam_faillock.soauthfail"); then
+                    cutlinenamber=$(cat "$auth_conf_file" | sed "s/ //g" | grep "auth\[default=die\]pam_faillock.soauthfail" -n | sed "s/:.*//g")
+                    head -n $cutlinenamber "$auth_conf_file" >"$auth_conf_file".tmp
+                    echo "auth       [success=1 default=ignore]  pam_succeed_if.so service = systemd-user quiet
+auth       required                    pam_ecryptfs.so unwrap" >> "$auth_conf_file".tmp
+                    tail -n +$(($cutlinenamber+1)) "$auth_conf_file" >> "$auth_conf_file".tmp
+                    mv -f "$auth_conf_file".tmp "$auth_conf_file"
+                fi
+                
+                
+                if $(cat "$auth_conf_file" | sed "s/ //g" | grep -q "passwordrequiredpam_unix.so"); then
+                    cutlinenamber=$(cat "$auth_conf_file" | sed "s/ //g" | grep "passwordrequiredpam_unix.so" -n | sed "s/:.*//g")
+                    head -n $cutlinenamber "$auth_conf_file" >"$auth_conf_file".tmp
+                    echo "password   optional                    pam_ecryptfs.so" >> "$auth_conf_file".tmp
+                    tail -n +$(($cutlinenamber+1)) "$auth_conf_file" >> "$auth_conf_file".tmp
+                    mv -f "$auth_conf_file".tmp "$auth_conf_file"
+                elif $(cat "$auth_conf_file" | sed "s/ //g" | grep -q --regexp="-password\[success=1default=ignore\]pam_systemd_home.so"); then
+                    cutlinenamber=$(cat "$auth_conf_file" | sed "s/ //g" | grep --regexp="-password\[success=1default=ignore\]pam_systemd_home.so" -n | sed "s/:.*//g")
+                    head -n $cutlinenamber "$auth_conf_file" >"$auth_conf_file".tmp
+                    echo "password   optional                    pam_ecryptfs.so" >> "$auth_conf_file".tmp
+                    tail -n +$(($cutlinenamber+1)) "$auth_conf_file" >> "$auth_conf_file".tmp
+                    mv -f "$auth_conf_file".tmp "$auth_conf_file"
+                fi
+                
+                
+                if $(cat "$auth_conf_file" | sed "s/ //g" | grep -q "sessionrequiredpam_unix.so"); then
+                    cutlinenamber=$(cat "$auth_conf_file" | sed "s/ //g" | grep "sessionrequiredpam_unix.so" -n | sed "s/:.*//g")
+                    head -n $cutlinenamber "$auth_conf_file" >"$auth_conf_file".tmp
+                    echo "session    [success=1 default=ignore]  pam_succeed_if.so service = systemd-user quiet
+session    optional                    pam_ecryptfs.so unwrap" >> "$auth_conf_file".tmp
+                    tail -n +$(($cutlinenamber+1)) "$auth_conf_file" >> "$auth_conf_file".tmp
+                    mv -f "$auth_conf_file".tmp "$auth_conf_file"
+                fi
+            fi
+            
+            
+            ecryptfs-migrate-home -u '$user_name' 
+            #rm -fr /home/'$user_name'.* '>/mnt/st2run
+            runchr "$1" |& tee -a /mnt/install.log
+            echo -e "if the home folder won't be decrypted, follow the instructions in README.txt\nand on https://wiki.archlinux.org/title/ECryptfs\n"
+            read -p 'press "enter" to continue'
+        fi
+        dialog --yesno '\nEnough with users?\n ' '' ''
+        if [ $? -eq 0 ]; then tmpvar25=0; fi
+    done
+}
+
+## ---------------------- ##
+## next internal function ##
+## ---------------------- ##
+
+fin_tune(){
+    ## tune system
+    ## $1 - exitstatusfile
+    
+    tmpmenuvar256=$(mktemp /tmp/XXXXXXX.tmp)
+    dialog --nocancel --checklist 'Select tasks to perform' '' '' '' \
+"01" "dhcpcd: disable if networkmanager/wicd installed" "on" \
+"02" "system-d DNS-recursor (cache): enable" "" \
+"03" "sddm/lxdm: enable if installed" "on" \
+"04" "sudo: enable wheel group at sudoers" "on" \
+"05" "sudo: enable sudo group at sudoers" "" \
+"06" "root: disable root" "on" \
+"07" "makepkg: enable smp make" "on" \
+"08" "makepkg: enable mtune=native as default" "" \
+"09" "makepkg: add multithreads compression" "on" \
+"10" "grub: add zswap" "on" \
+"11" "grub: disable audit" "" \
+"12" "grub: change colors" "on" \
+"13" "grub: fix silent boot" "on" \
+"14" "initrd: add some drivers" "on" \
+"15" "kernel: change hooks" "on" \
+"16" "pacman: enable colors" "on" \
+"17" "pacman: enable parallel downloads" "on" \
+"18" "hw clock: set to localtime" "" \
+"19" "tmp in ram: disable" "" \
+"20" "usb-dev affinity: set to 1st cpu core" "" \
+"21" "console: set global ua-lang and uniCyr-font" "" \
+"22" "cups: enable if installed" "on" \
+"23" "avahi-daemon.service: disable" "" \
+"24" "lvm2-services: disable" "" \
+"25" "systemd-journald.service: disable" "" 2>"$tmpmenuvar256"
+    
+    clear
+    
+    if $(cat "$tmpmenuvar256" | grep -q "01"); then
+        echo 'if [ -f /usr/lib/systemd/system/NetworkManager.service ]; then
+    systemctl disable dhcpcd 
+    systemctl enable NetworkManager.service
+elif [ -f /usr/lib/systemd/system/wicd.service ]; then
+    systemctl enable wicd.service
+elif [ -f /usr/lib/systemd/system/dhcpcd.service.service ]; then
+    systemctl enable dhcpcd
+fi' >/mnt/st2run
+        runchr "$1" |& tee -a /mnt/install.log
+    fi
+    if $(cat "$tmpmenuvar256" | grep -q "02"); then
+        if [ -f '/mnt/etc/resolv.conf' ]; then
+            mv /mnt/etc/resolv.conf /mnt/etc/resolv.conf.original
+        fi
+        # echo "nameserver 127.0.0.53" >/mnt/etc/resolv.conf
+        sudo ln -s /run/systemd/resolve/stub-resolv.conf /mnt/etc/resolv.conf
+        #chattr +i /mnt/etc/resolv.conf
+        
+        echo '
+systemctl enable systemd-resolved.service
+if [ -f /etc/resolved.conf ]; then
+    sed -i "s/DNS/#DNS/g" /etc/resolved.conf
 fi
-if $(cat "$tmpmenuvar256" | grep -q "11"); then
-    $0 f-ecf '/mnt/etc/makepkg.conf' '#MAKEFLAGS=' 'MAKEFLAGS='
-    $0 f-ecf '/mnt/etc/makepkg.conf' '-j2' '-j$(($(grep "model name" /proc/cpuinfo --count)+1))'
-fi
-if $(cat "$tmpmenuvar256" | grep -q "12"); then
-    $0 f-ecf '/mnt/etc/makepkg.conf' '-mtune=generic' '-mtune=native' 
-fi
-if $(cat "$tmpmenuvar256" | grep -q "13"); then
-    $0 f-ecf '/mnt/etc/makepkg.conf' 'xz -c -z' 'xz -c -z -T $(($(grep "model name" /proc/cpuinfo --count)+1))' 
-    $0 f-ecf '/mnt/etc/makepkg.conf' 'zstd -c -z -q' 'zstd -c -z -q -T$(($(grep "model name" /proc/cpuinfo --count)+1))'
-fi
-if $(cat "$tmpmenuvar256" | grep -q "14")&&[ -f /mnt/etc/default/grub ]; then
-    $0 f-ecf '/mnt/etc/default/grub' 'GRUB_CMDLINE_LINUX_DEFAULT="' 'GRUB_CMDLINE_LINUX_DEFAULT="zswap.compressor=lzo zswap.max_pool_percent=20 '
-fi
-if $(cat "$tmpmenuvar256" | grep -q "15")&&[ -f /mnt/etc/default/grub ]; then
-    $0 f-ecf '/mnt/etc/default/grub' '#GRUB_COLOR_NORMAL="light-blue/black"' 'GRUB_COLOR_NORMAL="light-cyan/black"'
-    $0 f-ecf '/mnt/etc/default/grub' '#GRUB_COLOR_HIGHLIGHT="light-cyan/blue"' 'GRUB_COLOR_HIGHLIGHT="black/light-cyan"'
-    $0 f-ecf '/mnt/etc/default/grub' '#GRUB_BACKGROUND="/path/to/wallpaper"' 'GRUB_BACKGROUND="/boot/grub/themes/starfield/starfield.png"'
-fi
-if $(cat "$tmpmenuvar256" | grep -q "16")&&[ -f /mnt/etc/mkinitcpio.conf ]; then
-    cp /mnt/etc/mkinitcpio.conf /mnt/etc/mkinitcpio.conf.orig 
-    $0 f-ecf '/mnt/etc/mkinitcpio.conf' 'MODULES=()' 'MODULES=(btrfs lz4 lzo zstd)'
-fi
-if $(cat "$tmpmenuvar256" | grep -q "17"); then
-    #$0 f-ecf '/mnt/etc/mkinitcpio.conf' 'HOOKS=(base udev autodetect modconf block filesystems keyboard fsck)' 'HOOKS=(base udev autodetect modconf block encrypt filesystems keyboard usr fsck shutdown)'
-    $0 f-ecf '/mnt/etc/mkinitcpio.conf' 'HOOKS=(base udev autodetect modconf block filesystems keyboard fsck)' 'HOOKS=(base udev autodetect modconf block filesystems keyboard usr fsck shutdown)'
-fi
-if $(cat "$tmpmenuvar256" | grep -q "18"); then
-    cp /mnt/etc/pacman.conf /mnt/etc/pacman.conf.orig
-    cat /mnt/etc/pacman.conf.orig | sed -e 's/#Color/Color/g' >/mnt/etc/pacman.conf
-fi
-if $(cat "$tmpmenuvar256" | grep -q "19"); then
-    echo 'timedatectl set-local-rtc 1' >/mnt/st2run
-    runchr "$1"
-fi
-if $(cat "$tmpmenuvar256" | grep -q "20"); then
-    echo 'systemctl mask tmp.mount' >/mnt/st2run
-    runchr "$1"
-fi
-if $(cat "$tmpmenuvar256" | grep -q "21"); then
-    serv_name=usb_int_aff_first_core
-    script_path=/usr/local/bin/
-echo '#!/bin/bash
+echo "## will be used cloudflare dns
+DNS=1.1.1.1 1.0.0.1
+DNSSEC=allow-downgrade
+DNSOverTLS=opportunistic
+" >>/etc/resolved.conf
+' >/mnt/st2run
+        runchr "$1" |& tee -a /mnt/install.log
+    fi
+    if $(cat "$tmpmenuvar256" | grep -q "03"); then
+        echo 'if [ -f /usr/lib/systemd/system/sddm.service ]; then
+    systemctl enable sddm.service
+elif [ -f /usr/lib/systemd/system/lxdm.service ]; then
+    systemctl enable lxdm.service
+fi' >/mnt/st2run
+        runchr "$1" |& tee -a /mnt/install.log
+    fi
+    if $(cat "$tmpmenuvar256" | grep -q "04")&&[ -f /mnt/etc/sudoers ]; then
+        fin_tune_var1=$(cat /mnt/etc/sudoers | grep wheel -n | grep ALL | grep -v NOPASS | sed 's/:.*//g')
+        head -n $(($fin_tune_var1-1)) /mnt/etc/sudoers > /mnt/etc/sudoers.new
+        echo '%wheel ALL=(ALL) ALL'>>/mnt/etc/sudoers.new
+        tail -n +$(($fin_tune_var1+1)) /mnt/etc/sudoers >>/mnt/etc/sudoers.new
+        mv -f /mnt/etc/sudoers.new /mnt/etc/sudoers
+        fin_tune_var1=''
+    fi
+    if $(cat "$tmpmenuvar256" | grep -q "05")&&[ -f /mnt/etc/sudoers ]; then
+        fin_tune_var1=$(cat /mnt/etc/sudoers | grep sudo -n | grep ALL | grep -v NOPASS | sed 's/:.*//g')
+        head -n $(($fin_tune_var1-1)) /mnt/etc/sudoers > /mnt/etc/sudoers.new
+        echo '%sudo ALL=(ALL) ALL'>>/mnt/etc/sudoers.new
+        tail -n +$(($fin_tune_var1+1)) /mnt/etc/sudoers >>/mnt/etc/sudoers.new
+        mv -f /mnt/etc/sudoers.new /mnt/etc/sudoers
+        fin_tune_var1=''
+    fi
+    if $(cat "$tmpmenuvar256" | grep -q "06"); then
+        echo 'passwd -l root' >/mnt/st2run
+        runchr "$1" |& tee -a /mnt/install.log
+    fi
+    if $(cat "$tmpmenuvar256" | grep -q "07"); then
+        $0 f-ecf '/mnt/etc/makepkg.conf' '#MAKEFLAGS=' 'MAKEFLAGS='
+        $0 f-ecf '/mnt/etc/makepkg.conf' '-j2' '-j$(($(grep "model name" /proc/cpuinfo --count)+1))'
+    fi
+    if $(cat "$tmpmenuvar256" | grep -q "08"); then
+        $0 f-ecf '/mnt/etc/makepkg.conf' '-mtune=generic' '-mtune=native' 
+    fi
+    if $(cat "$tmpmenuvar256" | grep -q "09"); then
+        $0 f-ecf '/mnt/etc/makepkg.conf' 'xz -c -z' 'xz -c -z -T $(($(grep "model name" /proc/cpuinfo --count)+1))' 
+        $0 f-ecf '/mnt/etc/makepkg.conf' 'zstd -c -z -q' 'zstd -c -z -q -T$(($(grep "model name" /proc/cpuinfo --count)+1))'
+    fi
+    if $(cat "$tmpmenuvar256" | grep -q "10")&&[ -f /mnt/etc/default/grub ]; then
+        $0 f-ecf '/mnt/etc/default/grub' 'GRUB_CMDLINE_LINUX_DEFAULT="' 'GRUB_CMDLINE_LINUX_DEFAULT="zswap.compressor=lzo zswap.max_pool_percent=20 '
+    fi
+    if $(cat "$tmpmenuvar256" | grep -q "11")&&[ -f /mnt/etc/default/grub ]; then
+        sed -i 's/GRUB_CMDLINE_LINUX_DEFAULT="/GRUB_CMDLINE_LINUX_DEFAULT=" audit=0 /g' /mnt/etc/default/grub
+    fi
+    if $(cat "$tmpmenuvar256" | grep -q "12")&&[ -f /mnt/etc/default/grub ]; then
+        $0 f-ecf '/mnt/etc/default/grub' '#GRUB_COLOR_NORMAL="light-blue/black"' 'GRUB_COLOR_NORMAL="light-cyan/black"'
+        $0 f-ecf '/mnt/etc/default/grub' '#GRUB_COLOR_HIGHLIGHT="light-cyan/blue"' 'GRUB_COLOR_HIGHLIGHT="black/light-cyan"'
+        $0 f-ecf '/mnt/etc/default/grub' '#GRUB_BACKGROUND="/path/to/wallpaper"' 'GRUB_BACKGROUND="/boot/grub/themes/starfield/starfield.png"'
+    fi
+    if $(cat "$tmpmenuvar256" | grep -q "13")&&[ -f /mnt/etc/default/grub ]; then
+        sed -i 's/loglevel=[0-9] //g' /mnt/etc/default/grub
+        sed -i 's/quiet/quiet loglevel=3 /g' /mnt/etc/default/grub
+    fi
+    if $(cat "$tmpmenuvar256" | grep -q "14")&&[ -f /mnt/etc/mkinitcpio.conf ]; then
+        cp /mnt/etc/mkinitcpio.conf /mnt/etc/mkinitcpio.conf.orig 
+        $0 f-ecf '/mnt/etc/mkinitcpio.conf' 'MODULES=()' "MODULES=($(echo $(lsmod | sed 's/ .*//g' | sed 's/Module//g')))"
+    fi
+    if $(cat "$tmpmenuvar256" | grep -q "15"); then
+        fin_tune_var1=$(cat /mnt/etc/mkinitcpio.conf | grep HOOK -n | grep -v '#' | sed 's/:.*//g')
+        head -n $(($fin_tune_var1-1)) /mnt/etc/mkinitcpio.conf > /mnt/etc/mkinitcpio.conf.new
+        if $(mount | grep '/mnt' | grep -q '/usr'); then 
+            fin_tune_var2="usr fsck shutdown"
+        else
+            fin_tune_var2="fsck"
+        fi
+        #if ;then
+        #   fin_tune_var3="mdadm encrypt lvm2"
+        #else
+            fin_tune_var3=""
+        #fi
+        echo "HOOKS=(base udev autodetect modconf block $fin_tune_var3 filesystems keyboard $fin_tune_var2)">>/mnt/etc/mkinitcpio.conf.new
+        tail -n +$(($fin_tune_var1+1)) /mnt/etc/mkinitcpio.conf >>/mnt/etc/mkinitcpio.conf.new
+        mv -f /mnt/etc/mkinitcpio.conf.new /mnt/etc/mkinitcpio.conf
+    fi
+    if $(cat "$tmpmenuvar256" | grep -q "16"); then
+        if [ ! -f "/mnt/etc/pacman.conf.orig" ]; then cp /mnt/etc/pacman.conf /mnt/etc/pacman.conf.orig ; fi
+        cat /mnt/etc/pacman.conf.orig | sed -e 's/#Color/Color/g' >/mnt/etc/pacman.conf
+    fi
+    if $(cat "$tmpmenuvar256" | grep -q "17"); then
+        if [ ! -f "/mnt/etc/pacman.conf.orig" ]; then cp /mnt/etc/pacman.conf /mnt/etc/pacman.conf.orig ; fi
+        sed -i -e 's/#ParallelDownloads/ParallelDownloads/g' '/mnt/etc/pacman.conf'
+    fi
+    if $(cat "$tmpmenuvar256" | grep -q "18"); then
+        echo 'timedatectl set-local-rtc 1' >/mnt/st2run
+        runchr "$1" |& tee -a /mnt/install.log
+    fi
+    if $(cat "$tmpmenuvar256" | grep -q "19"); then
+        echo 'systemctl mask tmp.mount' >/mnt/st2run
+        runchr "$1" |& tee -a /mnt/install.log
+    fi
+    if $(cat "$tmpmenuvar256" | grep -q "20"); then
+        serv_name=usb_int_aff_first_core
+        script_path=/usr/local/bin/
+        echo '#!/bin/bash
 for itr in $(grep usb /proc/interrupts | sed -e '"'s/\:.*//g'"') ; do  
     echo 1 > /proc/irq/$itr/smp_affinity
 done' > /mnt$script_path$serv_name
-chmod +x /mnt$script_path$serv_name
-echo "[Unit]
+        chmod +x /mnt$script_path$serv_name
+        echo "[Unit]
 Description=Reassigns the interrupt mapping of all USB controllers to the first processor core
 
 [Service]
@@ -1306,94 +1749,72 @@ ExecStart=$script_path$serv_name
 WantedBy=multi-user.target 
 
 " >/mnt/usr/lib/systemd/system/$serv_name.service
-    echo "systemctl enable $serv_name.service" >/mnt/st2run
-    runchr "$1"
-fi
-if $(cat "$tmpmenuvar256" | grep -q "22"); then
-    echo 'passwd -l root' >/mnt/st2run
-    runchr "$1"
-fi
-if $(cat "$tmpmenuvar256" | grep -q "23"); then
-    echo 'systemctl disable avahi-daemon.service' >/mnt/st2run
-    runchr "$1"
-fi
-if $(cat "$tmpmenuvar256" | grep -q "24"); then
-    echo 'systemctl disable lvm2-lvmetad.service'>/mnt/st2run
-    echo 'systemctl disable lvm2-monitor.service' >>/mnt/st2run
-    runchr "$1"
-fi
-if $(cat "$tmpmenuvar256" | grep -q "25"); then
-    echo 'systemctl disable systemd-journald.service' >/mnt/st2run
-    runchr "$1"
-fi
-if $(cat "$tmpmenuvar256" | grep -q "26"); then
-    if [ ! -f "/mnt/etc/pacman.conf.orig" ]; then
-        cp /mnt/etc/pacman.conf /mnt/etc/pacman.conf.orig
+        echo "systemctl enable $serv_name.service" >/mnt/st2run
+        runchr "$1" |& tee -a /mnt/install.log
     fi
-    sed -i -e 's/#ParallelDownloads/ParallelDownloads/g' '/mnt/etc/pacman.conf'
-fi
-if $(cat "$tmpmenuvar256" | grep -q "27"); then
-    if [ -f '/mnt/etc/resolv.conf' ]; then
-        mv /mnt/etc/resolv.conf /mnt/etc/resolv.conf.original
+    if $(cat "$tmpmenuvar256" | grep -q "21"); then
+        echo '#LANG="en_US.UTF-8" 
+LANG="uk_UA.UTF-8" 
+#LANG="ru_RU.UTF-8" ' > /mnt/etc/locale.conf
+        echo 'KEYMAP=us
+#KEYMAP_TOGGLE=ua
+FONT=UniCyr_8x16' > /mnt/etc/vconsole.conf
     fi
-    # echo "nameserver 127.0.0.53" >/mnt/etc/resolv.conf
-    sudo ln -s /run/systemd/resolve/stub-resolv.conf /mnt/etc/resolv.conf
-    #chattr +i /mnt/etc/resolv.conf
+    if $(cat "$tmpmenuvar256" | grep -q "22")&&[ -f /mnt/usr/lib/systemd/system/org.cups.cupsd.service ]; then
+        echo 'systemctl enable org.cups.cupsd.service' >/mnt/st2run
+        runchr "$1" |& tee -a /mnt/install.log
+    fi
+    if $(cat "$tmpmenuvar256" | grep -q "23"); then
+        #echo 'systemctl disable avahi-daemon.service' >/mnt/st2run
+        echo 'systemctl mask avahi-daemon.service' >/mnt/st2run
+        runchr "$1" |& tee -a /mnt/install.log
+    fi
+    if $(cat "$tmpmenuvar256" | grep -q "24"); then
+        #echo 'systemctl disable lvm2-lvmetad.service'>/mnt/st2run
+        #echo 'systemctl disable lvm2-monitor.service' >>/mnt/st2run
+        echo 'systemctl mask lvm2-lvmetad.service'>/mnt/st2run
+        echo 'systemctl mask lvm2-monitor.service' >>/mnt/st2run
+        runchr "$1" |& tee -a /mnt/install.log
+    fi
+    if $(cat "$tmpmenuvar256" | grep -q "25"); then
+        #echo 'systemctl disable systemd-journald.service' >/mnt/st2run
+        echo 'systemctl mask systemd-journald.service' >/mnt/st2run
+        runchr "$1" |& tee -a /mnt/install.log
+    fi
     
-    echo '
-    systemctl enable systemd-resolved.service
-    if [ -f /etc/resolved.conf ]; then
-        sed -i "s/DNS/#DNS/g" /etc/resolved.conf
+    rm -f $tmpmenuvar256
+        
+    ## install bootloader
+    if [ ! -f /mnt/etc/default/grub ]; then
+        dialog --title 'Error' --colors --msgbox "\n\Z1Grub bootloader is missing!\nSystem will be unbootable\n\n\Znunless you know how to boot without grub\nor you can install it manually in Arch-way" '' ''
+    else
+        if [ -d /mnt/boot/efi ]; then
+            echo 'pacman -S efibootmgr --noconfirm --needed 
+grub-install --target=x86_64-efi' >/mnt/st2run
+            runchr "$1" |& tee -a /mnt/install.log
+        else
+            echo ''>$1
+            gsdl "$1" "d"
+            tmpvar02=$(echo "$(cat "$1")")
+            tmpvar01='dialog --no-cancel --radiolist "Select disk to install GRUB bootloader" "" "" "" '
+            tmpvar01+=$(mk_menu_list "$tmpvar02" "" "")
+            tmpvar01+=' "none" "" "" 2>"'"$1"'"'
+            eval $tmpvar01
+            if [ "$(cat $1)" == "" ]||[ "$(cat $1)" == "none" ]; then
+                dialog --title 'Warning' --msgbox "grub is not set as system loader\nSystem will be unbootable\nunless you know how to boot without grub\nor you can install it manually in Arch-way" '' ''
+            else
+                clear
+                #echo 'grub-install /dev/$(cat '$1' | sed "s/ //g")' >/mnt/st2run
+                echo 'grub-install /dev/'$(cat "$1" | sed "s/ //g")' ' >/mnt/st2run
+                runchr "$1" |& tee -a /mnt/install.log
+            fi
+        fi
     fi
-    echo "## will be used cloudflare dns
-    DNS=1.1.1.1 1.0.0.1
-    DNSSEC=allow-downgrade
-    DNSOverTLS=opportunistic
-    " >>/etc/resolved.conf
-    ' >/mnt/st2run
-    runchr "$1"
-fi
-if $(cat "$tmpmenuvar256" | grep -q "28")&&[ -f /mnt/etc/default/grub ]; then
-    sed -i 's/loglevel=\?//g' /mnt/etc/default/grub
-    sed -i 's/quiet/quiet loglevel=3 /g' /mnt/etc/default/grub
-fi
-if $(cat "$tmpmenuvar256" | grep -q "29")&&[ -f /mnt/etc/default/grub ]; then
-    sed -i 's/GRUB_CMDLINE_LINUX_DEFAULT="/GRUB_CMDLINE_LINUX_DEFAULT=" audit=0 /g' /mnt/etc/default/grub
-fi
-rm -f $tmpmenuvar256
-echo "chown -R $user_name /home/$user_name" > /mnt/st2run
-runchr "$1"
-
-## install bootloader
-if [ -d /mnt/boot/efi ]; then
-    echo 'pacman -S efibootmgr --noconfirm --needed 
-    grub-install --target=x86_64-efi' >/mnt/st2run
-    runchr "$1"    
-else
-    echo ''>$1
-    #tmpvar02=testdik.img
-    #tmpvar02=$(echo $(ls /dev/disk/by-id | grep -v part | grep -v wwn))
-    tmpvar02=$(echo $(ls /dev | grep -e 'sd' -e 'vd' | grep -v "[1-9]" | grep -v 'dvd'))
-    tmpvar02+=' '$(echo $(ls /dev | grep -x -e "nvme[0-9]n[0-9]" -e "mmcblk[0-9]"))
-    tmpvar01='dialog --no-cancel --radiolist "Select disk to install GRUB bootloader" "" "" "" '
-    tmpvar01+=$(mk_menu_list "$tmpvar02" "" "")
-    tmpvar01+=' 2>"'"$1"'"'
-    eval $tmpvar01
-    clear
-    echo 'grub-install /dev/$(cat '$1' | sed "s/ //g")' >/mnt/st2run
-    runchr "$1"
-fi
-
-echo 'mkinitcpio -p linux
+    
+    echo 'mkinitcpio -p linux
 grub-mkconfig -o /boot/grub/grub.cfg' >/mnt/st2run
-runchr "$1"
+    runchr "$1" |& tee -a /mnt/install.log
 }
-
-## ---------------------- ##
-## next internal function ##
-## ---------------------- ##
-
-
 
 
 ############################
@@ -1405,3 +1826,17 @@ for ((c_y=1; c_y<=$inpar; c_y+=1)); do
   exefunc+='"${'$c_y'}" '
 done
 eval $exefunc
+
+############################
+## package templates section
+############################
+##
+## pkgtmpl: plasma @ - plasma desktop + libreoffice + firefox... @@ acpi alsa-utils acpid ark mkinitcpio audacity discover automake avidemux-qt autoconf bison bluez-cups binutils bluedevil bash bluez-hid2hci bzip2 btrfs-progs bluez-utils botan conky coreutils cdrdao cmake cups cups-pdf cryptsetup dhcpcd device-mapper dolphin diffutils dialog dvd+rw-tools dosfstools ed e2fsprogs f2fs-tools faac ecryptfs-utils findutils file fakeroot firefox filesystem foomatic-db-engine flex firefox-i18n-ru gawk firefox-i18n-uk gimp gcc gettext git gcc-libs gparted gsmartcontrol glibc grub grep gstreamer-vaapi gst-libav gst-plugins-good gwenview gst-plugins-ugly imake hidapi inetutils iproute2 gzip kcalc kate k3b iputils iw kimageformats krita konsole kdenetwork-filesharing kdegraphics-mobipocket kwalletmanager kscreen ladspa libmirage less libreoffice-fresh-ru libva-vdpau-driver libtool libreoffice-fresh libreoffice-fresh-uk linux-headers linux logrotate licenses libvdpau-va-gl man-pages lvm2 m4 man-db make mediainfo mdadm nano mc mkvtoolnix-gui networkmanager-openvpn netctl networkmanager networkmanager-qt noto-fonts-cjk ocl-icd ntfs-3g noto-fonts-emoji nvidia-settings nvidia-dkms okular p7zip opencl-headers opencl-nvidia os-prober pciutils pacman packagekit-qt5 perl patch plasma-desktop powerdevil pigz plasma-nm plasma-pa psmisc pulseaudio-bluetooth pulseaudio-alsa procps-ng psutils qt5-virtualkeyboard qt5-connectivity qt5-imageformats ragel qt5-serialport sddm rcs sddm-kcm sed samba sysfsutils sudo tar systemd-sysvcompat shadow texinfo thunderbird-i18n-ru thunderbird-i18n-uk transcode thunderbird ufw uget unrar unzip transmission-qt util-linux usbutils vcdimager vi vlc which wget wireless-regdb xf86-input-evdev xf86-input-void xf86-video-ati xf86-input-synaptics xf86-input-vmmouse xf86-input-libinput xf86-video-vesa xf86-video-fbdev xf86-video-ati xf86-video-amdgpu xf86-video-dummy xmlto xorg-docs xorg-bdftopcf xf86-video-nouveau xf86-video-intel xorg-fonts-100dpi xorg-fonts-75dpi xorg-fonts-encodings xorg-font-util xorg-fonts-cyrillic xorg-iceauth xorg-server-devel xorg-server xorg-mkfontscale xorg-server-common xorg-server-xvfb xorg-sessreg xorg-server-xnest xorg-server-xephyr xorg-setxkbmap xorg-x11perf xorg-xauth xorg-smproxy xorg-xbacklight xorg-xcursorgen xorg-xdpyinfo xorg-xev xorg-xdriinfo xorg-xcmsdb xorg-xgamma xorg-xkbcomp xorg-xinput xorg-xkbevd xorg-xhost xorg-xlsclients xorg-xmodmap xorg-xlsatoms xorg-xkbutils xorg-xkill xorg-xpr xorg-xrefresh xorg-xprop xorg-xrandr xorg-xrdb xorg-xvinfo xorg-xsetroot xorg-xwininfo xorg-xwd xorg-xset yasm xsane xorg-xwud xsane-gimp zip 
+##
+## pkgtmpl: xfce @ - xfce desktop + firefox... @@ base bluez btrfs-progs dhcpcd diffutils dialog firefox ffmpeg f2fs-tools gvfs-afc gvfs gparted grub gimp gvfs-mtp htop gvfs-gphoto2 inetutils gvfs-smb lxdm logrotate linux lvm2 man-db man-pages mkinitcpio mc mdadm mousepad nano networkmanager network-manager-applet netctl mpv pavucontrol nm-connection-editor pulseaudio-alsa os-prober p7zip thunar texinfo thunar-archive-plugin sudo samba which vi xf86-input-evdev thunar-volman unrar xf86-video-amdgpu xf86-input-wacom xf86-input-libinput xf86-input-void xf86-input-synaptics xf86-video-nouveau xf86-video-intel xf86-video-ati xf86-video-vesa xf86-video-fbdev xfce4-clipman-plugin xfce4-appfinder xfce4-cpufreq-plugin xfce4-artwork xfce4-battery-plugin xfce4-datetime-plugin xfce4-cpugraph-plugin xfce4-mount-plugin xfce4-genmon-plugin xfce4-fsguard-plugin xfce4-notifyd xfce4-netload-plugin xfce4-power-manager xfce4-pulseaudio-plugin xfce4-panel xfce4-screenshooter xfce4-session xfce4-sensors-plugin xfce4-settings xfce4-systemload-plugin xfce4-time-out-plugin xfce4-terminal xfce4-taskmanager xfce4-timer-plugin xfce4-verve-plugin xfce4-wavelan-plugin xfwm4 xfce4-whiskermenu-plugin xfce4-xkb-plugin xfdesktop xfwm4-themes xorg-server xorg-iceauth xorg-fonts-100dpi xorg-fonts-75dpi xorg-xauth xorg-xbacklight xorg-setxkbmap xorg-smproxy xorg-sessreg xorg-xcursorgen xorg-xdriinfo xorg-xcmsdb xorg-xdpyinfo xorg-xev xorg-xkbevd xorg-xkill xorg-xgamma xorg-xkbutils xorg-xinput xorg-xlsclients xorg-xmodmap xorg-xpr xorg-xprop xorg-xlsatoms xorg-xrandr xorg-xrefresh xorg-xset xorg-xrdb xorg-xsetroot xorg-xvinfo xorg-xwd zip xorg-xwininfo xorg-xwud 
+##
+## pkgtmpl: lxqt @ - base system and lxqt desktop @@ b43-fwcutter alsa-utils acpi alsa-firmware acpid btrfs-progs cifs-utils base dhclient ecryptfs-utils dhcpcd diffutils dmraid dialog inetutils liblxqt f2fs-tools grub haveged linux-firmware linux linux-headers logrotate lximage-qt lxqt-config lxqt-archiver lxqt-about lxqt-admin lxqt-globalkeys lxqt-notificationd lxqt-openssh-askpass lxqt-panel lxqt-policykit lxqt-powermanagement lxqt-session lxqt-runner lxqt-themes lxqt-qtplugin lxqt-sudo mkinitcpio man-db man-pages mdadm nano net-tools networkmanager-qt nm-connection-editor ntfs-3g network-manager-applet os-prober obconf-qt openbox pcmanfm-qt openssh powertop s-nail rsync reflector pulseaudio-alsa sysfsutils sudo syslog-ng screengrab sddm which usbutils wpa_supplicant texinfo xdg-user-dirs xf86-input-vmmouse xdg-utils xf86-video-dummy xf86-video-amdgpu xf86-video-ati xf86-video-intel xf86-video-nouveau xf86-video-sisusb xf86-video-openchrome xf86-video-fbdev xf86-video-vesa xf86-video-vmware xf86-video-voodoo xorg-iceauth xorg-server xorg-xbacklight xorg-sessreg xorg-setxkbmap xorg-smproxy xorg-xauth xorg-xcmsdb xorg-xev xorg-xdpyinfo xorg-xcursorgen xorg-xdriinfo xorg-xkbutils xorg-xkbevd xorg-xinit xorg-xgamma xorg-xinput xorg-xlsclients xorg-xlsatoms xorg-xkill xorg-xpr xorg-xmodmap xorg-xrdb xorg-xrefresh xorg-xprop xorg-xrandr xorg-xset xorg-xwininfo xorg-xwd xorg-xvinfo xorg-xwud xorg-xsetroot xterm zip 
+##
+## pkgtmpl: minimal @ - very limited base system @@ base linux bash sudo grub 
+##
+############################
